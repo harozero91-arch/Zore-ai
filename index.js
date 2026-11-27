@@ -553,7 +553,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     chosen.forEach((p,i)=>{
       const angle=(i/chosen.length)*Math.PI*2-Math.PI/2;
       const seat={x:Math.cos(angle)*3.45,z:1+Math.sin(angle)*3.45,yaw:-angle+Math.PI/2};
-      const approach={x:Math.cos(angle)*4.65,z:1+Math.sin(angle)*4.65};
+      const approach={x:Math.cos(angle+0.34)*4.65,z:1+Math.sin(angle+0.34)*4.65};
       setSeatedPose(p,false);p.userData.partner=null;p.userData.seat=seat;
       p.userData.state="going_to_meeting";p.userData.target.set(approach.x,0.12,approach.z);
       p.userData.meetingSeat=seat;p.userData.spoke=false;
