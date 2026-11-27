@@ -30,6 +30,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
       <div class="zore-office__viewport">
         <div class="zore-office__canvas"></div>
         <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>
+        <div class="zore-office__views" aria-label="Sudut pandang kantor">
+          <button type="button" data-view="front" class="is-active">Depan</button>
+          <button type="button" data-view="left">Sektor kiri</button>
+          <button type="button" data-view="right">Sektor kanan</button>
+        </div>
         <label class="zore-office__light">Intensitas cahaya <input data-light type="range" min="0.35" max="2.2" step="0.05" value="1.25"></label>
         <div class="zore-office__help">Tampilan tetap · satu area kantor terbuka</div>
       </div>
@@ -88,7 +93,6 @@ export function mountZoreVirtualOffice(host, options = {}) {
   box(building, 0, 3.1, -OFFICE.d/2, OFFICE.w, 6.2, 0.28, wallMat);
   box(building, -OFFICE.w/2, 3.1, 0, 0.28, 6.2, OFFICE.d, wallMat);
   box(building, OFFICE.w/2, 3.1, 0, 0.28, 6.2, OFFICE.d, wallMat);
-  box(building, 0, 6.25, 0, OFFICE.w, 0.2, OFFICE.d, goldMat, false);
 
   // Open-plan workstations distributed across one shared floor.
   for (let i = 0; i < 9; i++) {
@@ -154,6 +158,21 @@ export function mountZoreVirtualOffice(host, options = {}) {
     scene.background.set(0x171d28); scene.fog.color.set(0x171d28);
     sun.intensity = 0.28; chandelier.intensity = 65;
   });
+  const viewPositions = {
+    front: new THREE.Vector3(0, 27, 43),
+    left: new THREE.Vector3(-43, 24, 18),
+    right: new THREE.Vector3(43, 24, 18)
+  };
+  host.querySelectorAll("[data-view]").forEach(button => {
+    button.addEventListener("click", () => {
+      const position = viewPositions[button.dataset.view];
+      if (!position) return;
+      camera.position.copy(position);
+      camera.lookAt(0, 1.5, 0);
+      host.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("is-active", item === button));
+    });
+  });
+
   host.querySelector("[data-light]").addEventListener("input", e => {
     const value = Number(e.target.value);
     sun.intensity = value * 1.55; chandelier.intensity = value * 28;
