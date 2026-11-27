@@ -724,14 +724,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const baseAzimuth = spherical.theta;
   const basePolar = spherical.phi;
   // Slightly wider default framing, a little more camera orbit range and sensitivity.
-  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.38 };
+  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.12 };
   const limits = {
     minTheta: baseAzimuth - THREE.MathUtils.degToRad(45),
     maxTheta: baseAzimuth + THREE.MathUtils.degToRad(45),
     minPhi: Math.max(THREE.MathUtils.degToRad(26), basePolar - THREE.MathUtils.degToRad(14)),
     maxPhi: Math.min(THREE.MathUtils.degToRad(74), basePolar + THREE.MathUtils.degToRad(14)),
-    minRadius: spherical.radius * 0.82,
-    maxRadius: spherical.radius * 2.05
+    minRadius: spherical.radius * 0.62,
+    maxRadius: spherical.radius * 1.75
   };
   const touchSurface = renderer.domElement;
   const pointers = new Map();
