@@ -30,7 +30,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
     <div class="zore-office__layout zore-office__layout--single">
       <div class="zore-office__viewport">
         <div class="zore-office__canvas"></div>
-        <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>\n        <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
+        <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>
+        <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
         <div class="zore-office__touch-hint">Geser satu jari untuk melihat sisi · cubit dua jari untuk zoom</div>
         <label class="zore-office__light">Intensitas cahaya <input data-light type="range" min="0.35" max="2.2" step="0.05" value="1.25"></label>
         <div class="zore-office__help">Tampilan tetap · satu area kantor terbuka</div>
@@ -840,7 +841,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
         // Preserve reserved destinations while an employee is approaching a desk or meeting seat.
-        if (distance < 0.35 && !data.partner && data.state === "walking") { data.state="idle"; data.idleUntil=now+THREE.MathUtils.randFloat(7000,14000); }\n        if (data.state==="idle" && now >= (data.idleUntil||0)) { data.state="walking"; chooseWalkTarget(o); }
+        if (distance < 0.35 && !data.partner && data.state === "walking") { data.state="idle"; data.idleUntil=now+THREE.MathUtils.randFloat(7000,14000); }
+        if (data.state==="idle" && now >= (data.idleUntil||0)) { data.state="walking"; chooseWalkTarget(o); }
         if(data.state==="going_to_meeting" && distance<0.48 && data.meetingSeat){
           o.position.set(data.meetingSeat.x,0.5,data.meetingSeat.z);
           o.rotation.y=data.meetingSeat.yaw;
