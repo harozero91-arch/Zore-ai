@@ -88,38 +88,191 @@ export function mountZoreVirtualOffice(host, options = {}) {
     mesh.position.set(x, y, z); mesh.castShadow = true; parent.add(mesh); return mesh;
   }
 
-  // One unified open-plan office: no separate rooms or internal partitions.
+  // Isometric open-plan ZORE campus inspired by the supplied reference.
+  // Keep one connected floor, open front, roofless walls and transparent glass dividers.
   box(building, 0, 0.08, 0, OFFICE.w, 0.25, OFFICE.d, woodMat, false);
-  box(building, 0, 3.1, -OFFICE.d/2, OFFICE.w, 6.2, 0.28, wallMat);
-  box(building, -OFFICE.w/2, 3.1, 0, 0.28, 6.2, OFFICE.d, wallMat);
-  box(building, OFFICE.w/2, 3.1, 0, 0.28, 6.2, OFFICE.d, wallMat);
 
-  // Open-plan workstations distributed across one shared floor.
-  for (let i = 0; i < 9; i++) {
-    const x = (i % 3 - 1) * 10;
-    const z = Math.floor(i / 3) * 8 - 7;
-    box(building, x, 0.92, z, 3.2, 0.14, 1.45, woodMat);
-    box(building, x, 0.48, z + 0.78, 0.75, 0.88, 0.75, darkMat);
-    box(building, x, 1.48, z - 0.12, 1.35, 0.08, 0.08, goldMat);
+  // Warm herringbone-inspired floor strips.
+  const floorLight = material(0xd8b98d, 0.72);
+  const floorDark = material(0xb88f61, 0.72);
+  for (let row = 0; row < 15; row++) {
+    const z = -14 + row * 2;
+    for (let col = 0; col < 10; col++) {
+      const x = -19 + col * 4;
+      const tile = box(building, x, 0.218, z, 3.85, 0.025, 1.82,
+        (row + col) % 2 ? floorLight : floorDark, false);
+      tile.rotation.y = (row % 2) * 0.025;
+    }
   }
-  // Shared meeting table and lounge seating remain open to the main office.
-  box(building, -12, 0.78, 9, 5.2, 0.16, 2.2, woodMat);
-  for (const x of [-14, -10]) for (const z of [7, 11]) {
-    box(building, x, 0.42, z, 0.9, 0.75, 0.9, emeraldMat);
-  }
-  box(building, 12, 0.72, 9, 4.5, 0.18, 1.8, woodMat);
-  box(building, 12, 0.38, 11, 5.2, 0.65, 0.8, emeraldMat);
 
-  // Crystal chandelier
-  const chandelierGroup = new THREE.Group(); chandelierGroup.position.set(0, 5.6, 0); scene.add(chandelierGroup);
-  cylinder(chandelierGroup, 0, 0, 0, 0.13, 0.13, 2.2, goldMat);
-  for (let i=0; i<8; i++) {
+  // Rear and side walls; front stays open for a dollhouse/isometric view.
+  box(building, 0, 3.1, -15, 42, 6.2, 0.3, wallMat);
+  box(building, -21, 3.1, 0, 0.3, 30, 6.2, wallMat);
+  box(building, 21, 3.1, 0, 0.3, 30, 6.2, wallMat);
+  // Wall skirting and architectural trim.
+  box(building, 0, 0.34, -14.78, 41.7, 0.22, 0.12, goldMat, false);
+  box(building, -20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
+  box(building, 20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
+
+  const glassMat = new THREE.MeshStandardMaterial({
+    color: 0x9fc5bd, transparent: true, opacity: 0.22, roughness: 0.16, metalness: 0.12
+  });
+  const frameMat = material(0x242c2b, 0.35, 0.55);
+  function glassPartition(x, z, length, alongX = true, height = 3.0) {
+    const panel = box(building, x, height / 2 + 0.2, z,
+      alongX ? length : 0.12, height, alongX ? 0.12 : length, glassMat, false);
+    panel.material = glassMat;
+    const count = Math.max(2, Math.floor(length / 1.7));
+    for (let i = 0; i <= count; i++) {
+      const offset = -length / 2 + length * i / count;
+      box(building, x + (alongX ? offset : 0), height / 2 + 0.2,
+        z + (alongX ? 0 : offset), 0.09, height + 0.12, 0.09, frameMat, false);
+    }
+    box(building, x, 0.28, z, alongX ? length : 0.14, 0.12, alongX ? 0.14 : length, frameMat, false);
+    box(building, x, height + 0.26, z, alongX ? length : 0.14, 0.12, alongX ? 0.14 : length, frameMat, false);
+  }
+
+  // Glass team pods on both sides, with wide walkways between them.
+  glassPartition(-15.2, -6.4, 8.0, false, 2.7);
+  glassPartition(-8.6, -10.1, 6.2, true, 2.7);
+  glassPartition(8.8, -10.0, 6.4, true, 2.7);
+  glassPartition(15.3, -5.8, 8.2, false, 2.7);
+  glassPartition(-15.0, 3.1, 7.2, false, 2.7);
+  glassPartition(15.0, 3.1, 7.2, false, 2.7);
+
+  const deskTop = material(0xb98250, 0.42);
+  const deskEdge = material(0x70452e, 0.48);
+  const screenMat = material(0x172b3a, 0.22, 0.25);
+  const screenGlow = material(0x39a6c3, 0.28, 0.2);
+  const chairMat = material(0x315d78, 0.58);
+  const plantLeaf = material(0x39764c, 0.78);
+  const potMat = material(0xd6c7ad, 0.8);
+
+  function addMonitor(x, z, rotation = 0, scale = 1) {
+    const group = new THREE.Group();
+    group.position.set(x, 0.3, z); group.rotation.y = rotation; building.add(group);
+    box(group, 0, 1.12 * scale, 0, 1.22 * scale, 0.76 * scale, 0.09, screenMat);
+    box(group, 0, 1.12 * scale, 0.052, 1.08 * scale, 0.61 * scale, 0.012, screenGlow, false);
+    box(group, 0, 0.68 * scale, 0.02, 0.09 * scale, 0.2 * scale, 0.12, darkMat);
+    box(group, 0, 0.56 * scale, 0.02, 0.48 * scale, 0.06 * scale, 0.28 * scale, darkMat);
+    // Small chart bars on the glowing display.
+    for (let i = 0; i < 4; i++) box(group, (-0.32 + i * 0.2) * scale,
+      (0.91 + (i % 3) * 0.09) * scale, 0.064, 0.07 * scale,
+      (0.12 + (i % 3) * 0.18) * scale, 0.012, goldMat, false);
+  }
+
+  function addDesk(x, z, rotation = 0, chairColor = chairMat, width = 3.25) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z); group.rotation.y = rotation; building.add(group);
+    box(group, 0, 0.94, 0, width, 0.16, 1.45, deskTop);
+    box(group, 0, 0.83, 0, width + 0.08, 0.07, 1.5, deskEdge);
+    for (const dx of [-width / 2 + 0.18, width / 2 - 0.18]) {
+      box(group, dx, 0.46, 0, 0.13, 0.78, 1.18, darkMat);
+    }
+    addMonitor(x - 0.25 * Math.cos(rotation), z - 0.25 * Math.sin(rotation), rotation, 0.85);
+    // Keyboard and desk accessories.
+    box(group, 0.35, 1.045, 0.48, 0.72, 0.035, 0.24, darkMat, false);
+    const mug = cylinder(group, -width / 2 + 0.45, 1.12, 0.42, 0.12, 0.12, 0.18, ivoryMat);
+    mug.rotation.z = 0;
+    // Rolling chair behind the desk.
+    const chair = new THREE.Group(); chair.position.set(0, 0, 1.35); group.add(chair);
+    box(chair, 0, 0.78, 0, 0.78, 0.18, 0.72, chairColor);
+    box(chair, 0, 1.28, 0.28, 0.78, 0.92, 0.16, chairColor);
+    cylinder(chair, 0, 0.38, 0, 0.09, 0.09, 0.55, darkMat);
+    for (let i = 0; i < 5; i++) {
+      const a = i * Math.PI * 2 / 5;
+      box(chair, Math.cos(a) * 0.28, 0.12, Math.sin(a) * 0.28, 0.48, 0.07, 0.08, darkMat);
+    }
+  }
+
+  // Eight individual workstations arranged in glass-fronted team areas.
+  const deskSpots = [
+    [-16.5,-11.2,0],[-10.7,-11.2,0],[-16.5,-2.1,0],[-10.7,-2.1,0],
+    [10.7,-11.2,Math.PI],[16.5,-11.2,Math.PI],[10.7,-2.1,Math.PI],[16.5,-2.1,Math.PI],
+    [-5.4,-11.2,0],[0,-11.2,0],[5.4,-11.2,0]
+  ];
+  deskSpots.forEach((p, i) => addDesk(p[0], p[1], p[2], i % 2 ? emeraldMat : chairMat, 2.8));
+
+  // Central round meeting table, chairs, laptops and presentation display.
+  const meeting = new THREE.Group(); meeting.position.set(0, 0, 1.0); building.add(meeting);
+  cylinder(meeting, 0, 0.92, 0, 2.65, 2.65, 0.2, deskTop);
+  cylinder(meeting, 0, 0.48, 0, 0.34, 0.5, 0.75, woodMat);
+  cylinder(meeting, 0, 0.34, 0, 1.05, 1.05, 0.12, deskEdge);
+  for (let i = 0; i < 8; i++) {
     const a = i * Math.PI / 4;
-    const arm = new THREE.Mesh(new THREE.TorusGeometry(1.2, 0.045, 8, 24, Math.PI), goldMat);
-    arm.rotation.x = Math.PI/2; arm.rotation.z = a; chandelierGroup.add(arm);
-    const crystal = new THREE.Mesh(new THREE.OctahedronGeometry(0.2), material(0xfff2d5, 0.12, 0.2));
-    crystal.position.set(Math.cos(a)*1.2, -0.75, Math.sin(a)*1.2); chandelierGroup.add(crystal);
+    const seat = new THREE.Group();
+    seat.position.set(Math.cos(a) * 3.45, 0, Math.sin(a) * 3.45);
+    seat.rotation.y = -a + Math.PI / 2; meeting.add(seat);
+    box(seat, 0, 0.58, 0, 0.92, 0.18, 0.86, i % 2 ? emeraldMat : material(0x7b3946));
+    box(seat, 0, 1.2, -0.34, 0.92, 1.15, 0.18, i % 2 ? emeraldMat : material(0x7b3946));
+    cylinder(seat, 0, 0.25, 0, 0.08, 0.08, 0.5, darkMat);
   }
+  for (let i = 0; i < 4; i++) {
+    const a = i * Math.PI / 2;
+    box(meeting, Math.cos(a) * 1.45, 1.06, Math.sin(a) * 1.45, 0.58, 0.05, 0.38, screenMat, false);
+  }
+  // Meeting-room rug.
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(6.0, 48), material(0x263f55, 0.95));
+  rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.24, 1); building.add(rug);
+
+  // Reception desk and branded wall at the open entrance, left side.
+  const reception = new THREE.Group(); reception.position.set(-14.3, 0, 10.4); reception.rotation.y = Math.PI / 2; building.add(reception);
+  box(reception, 0, 0.58, 0, 4.5, 1.1, 1.35, woodMat);
+  box(reception, 0, 1.18, 0, 4.7, 0.16, 1.48, material(0xe8dfd0, 0.25));
+  box(reception, 0, 0.6, 0.7, 4.25, 0.68, 0.08, goldMat, false);
+  const logoCanvas = document.createElement("canvas"); logoCanvas.width = 512; logoCanvas.height = 128;
+  const logoCtx = logoCanvas.getContext("2d"); logoCtx.fillStyle = "#f4d99f";
+  logoCtx.font = "bold 76px Georgia"; logoCtx.textAlign = "center"; logoCtx.fillText("ZORE AI",256,88);
+  const logoTexture = new THREE.CanvasTexture(logoCanvas); logoTexture.colorSpace = THREE.SRGBColorSpace;
+  const logo = new THREE.Mesh(new THREE.PlaneGeometry(3.4,0.85), new THREE.MeshBasicMaterial({map:logoTexture,transparent:true}));
+  logo.position.set(0, 0.72, 0.755); reception.add(logo);
+
+  // Lounge area in the front-right corner: sofa, coffee table and carpet.
+  const loungeRug = new THREE.Mesh(new THREE.CircleGeometry(5.2, 40), material(0x2b6070, 0.95));
+  loungeRug.rotation.x = -Math.PI / 2; loungeRug.position.set(12.0, 0.24, 10.0); building.add(loungeRug);
+  const sofaMat = material(0x294d69, 0.72);
+  box(building, 12, 0.72, 12.4, 8.2, 0.55, 1.25, sofaMat);
+  box(building, 12, 1.25, 13.0, 8.2, 1.05, 0.38, sofaMat);
+  box(building, 7.95, 0.95, 11.2, 0.42, 1.0, 2.8, sofaMat);
+  box(building, 16.05, 0.95, 11.2, 0.42, 1.0, 2.8, sofaMat);
+  box(building, 12, 0.62, 8.5, 3.3, 0.18, 1.8, deskTop);
+  for (const x of [10.9,13.1]) box(building, x, 0.32, 8.5, 0.12, 0.55, 0.12, darkMat);
+  box(building, 12, 0.74, 8.35, 0.8, 0.07, 0.5, material(0xeee4d2), false);
+
+  // Indoor plants: tapered pots and layered foliage.
+  function addPlant(x, z, scale = 1) {
+    const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.38*scale,0.28*scale,0.72*scale,18), potMat);
+    pot.position.set(x,0.58*scale,z); building.add(pot);
+    cylinder(building,x,0.98*scale,z,0.13*scale,0.13*scale,0.6*scale,woodMat);
+    for (let i=0;i<7;i++) {
+      const a=i*Math.PI*2/7;
+      const leaf=new THREE.Mesh(new THREE.SphereGeometry(0.22*scale,10,8),plantLeaf);
+      leaf.scale.set(0.55,1.9,0.42);
+      leaf.position.set(x+Math.cos(a)*0.45*scale,1.5*scale+(i%3)*0.16*scale,z+Math.sin(a)*0.45*scale);
+      leaf.rotation.z=Math.cos(a)*0.45; leaf.rotation.x=Math.sin(a)*0.35; building.add(leaf);
+    }
+  }
+  [[-19,-13,1.2],[-19,7,1.0],[-7,-14,0.9],[7,-14,0.9],[19,-12,1.1],
+    [19,5,1.0],[-19,13,1.1],[19,14,1.0],[4,7,0.8]].forEach(p=>addPlant(...p));
+
+  // Wall art and large dashboard panels add the polished creative-office character.
+  function wallScreen(x, y, z, rotation = 0, width = 3.2, height = 1.8) {
+    const panel = new THREE.Group(); panel.position.set(x,y,z); panel.rotation.y=rotation; building.add(panel);
+    box(panel,0,0,0,width+0.18,height+0.18,0.12,frameMat);
+    box(panel,0,0,0.075,width,height,0.025,screenMat,false);
+    for(let i=0;i<4;i++) box(panel,-width*0.32+i*width*0.2,-height*0.22+(i%3)*0.12,0.095,0.12,0.18+(i%3)*0.12,0.015,screenGlow,false);
+  }
+  wallScreen(-12.5,3.9,-14.78,0,3.5,2.0);
+  wallScreen(12.5,3.9,-14.78,0,3.5,2.0);
+  wallScreen(-20.78,3.6,-7.5,Math.PI/2,2.8,1.7);
+  wallScreen(20.78,3.6,-7.5,-Math.PI/2,2.8,1.7);
+
+  // Ceiling is intentionally omitted so the complete interior remains visible.
+  // Warm architectural lighting.
+  const pendant = new THREE.PointLight(0xffd69a, 28, 28);
+  pendant.position.set(0,5.8,-5); scene.add(pendant);
+  const entranceLight = new THREE.PointLight(0xffe2b4, 18, 20);
+  entranceLight.position.set(-14,4,10); scene.add(entranceLight);
 
   // Living employee agents: distinct appearance, autonomous walking and social conversations.
   const employeeObjects = [];
