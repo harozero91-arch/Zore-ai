@@ -21,6 +21,73 @@ let currentTask = {
 let currentEvent = "";
 let taskDraft = "";
 let officeInstance = null;
+const ACTIVITY_STORAGE_KEY = "zore-ai-activity-log";
+
+function loadActivityLog() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(ACTIVITY_STORAGE_KEY) || "[]");
+    return Array.isArray(saved) ? saved : [];
+  } catch {
+    return [];
+  }
+}
+
+let activityLog = loadActivityLog();
+
+function saveActivityLog() {
+  try {
+    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(activityLog));
+  } catch (error) {
+    console.warn("Riwayat aktivitas tidak dapat disimpan:", error);
+  }
+}
+
+function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, character => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  })[character]);
+}
+
+function renderActivityMonitor() {
+  const active = activityLog.filter(item => item.status === "active").length;
+  const completed = activityLog.filter(item => item.status === "completed").length;
+  const blocked = activityLog.filter(item => item.status === "blocked").length;
+
+  const rows = activityLog.length
+    ? activityLog.slice().reverse().map(item => {
+        const employee = EMPLOYEE_PROFILES.find(person => person.id === item.employeeId);
+        const statusText = item.status === "completed" ? "Selesai (manual)"
+          : item.status === "blocked" ? "Terhambat" : "Aktivitas visual aktif";
+        const resultText = item.status === "completed"
+          ? "Ditandai selesai oleh operator."
+          : item.status === "blocked"
+            ? "Menunggu tindak lanjut operator."
+            : "Belum ada hasil otomatis. Tugas AI/backend belum terhubung.";
+        const progress = item.status === "completed" ? 100 : 0;
+        return '<article class="activity-item">' +
+          '<div class="activity-item-top"><div><span class="activity-employee">' +
+          escapeHtml(employee?.name || "Karyawan") + '</span><h4>' + escapeHtml(item.title) +
+          '</h4></div><span class="activity-status ' + item.status + '">' + statusText + '</span></div>' +
+          '<p class="activity-role">' + escapeHtml(employee?.role || "") + ' · ' +
+          new Date(item.createdAt).toLocaleString("id-ID") + '</p>' +
+          '<div class="activity-progress-label"><span>Progres tercatat</span><strong>' + progress +
+          '%</strong></div><div class="activity-progress"><span style="width:' + progress +
+          '%"></span></div><p class="activity-result">' + resultText + '</p>' +
+          (item.status !== "completed" ? '<button class="activity-complete" data-complete="' +
+          escapeHtml(item.id) + '">Tandai selesai manual</button>' : '') + '</article>';
+      }).join("")
+    : '<p class="activity-empty">Belum ada tugas. Berikan tugas melalui panel di atas untuk mulai memantau aktivitas.</p>';
+
+  return '<section class="activity-monitor" id="activity-monitor">' +
+    '<div class="activity-heading"><div><span class="activity-kicker">LIVE WORKSPACE</span>' +
+    '<h2>Pusat Pemantauan Aktivitas</h2><p>Pantau penugasan dan status yang tercatat di perangkat ini.</p></div>' +
+    '<span class="activity-live"><i></i> PEMANTAUAN AKTIF</span></div>' +
+    '<div class="activity-stats"><div><strong>' + activityLog.length + '</strong><span>Total tugas</span></div>' +
+    '<div><strong>' + active + '</strong><span>Aktif</span></div><div><strong>' + completed +
+    '</strong><span>Selesai</span></div><div><strong>' + blocked + '</strong><span>Terhambat</span></div></div>' +
+    '<div class="activity-list">' + rows + '</div>' +
+    '<p class="activity-disclaimer">Catatan: riwayat disimpan di browser perangkat ini. Progres 0% berarti belum ada eksekusi kerja yang terukur; AI/backend belum menjalankan tugas secara otomatis. Status selesai hanya berubah jika operator menandainya.</p></section>';
+}
 
 function renderEmployee(employee) {
   const state = getCharacterState(
@@ -240,6 +307,8 @@ function render() {
         </button>
       </section>
 
+      ${renderActivityMonitor()}
+
       <section class="team-section">
         <div class="section-heading">
           <div>
@@ -279,6 +348,17 @@ function render() {
     taskDraft = event.target.value;
   });
 
+  document.querySelector("#activity-monitor").addEventListener("click", event => {
+    const button = event.target.closest("[data-complete]");
+    if (!button) return;
+    const item = activityLog.find(entry => entry.id === button.dataset.complete);
+    if (!item) return;
+    item.status = "completed";
+    item.completedAt = new Date().toISOString();
+    saveActivityLog();
+    render();
+  });
+
   document.querySelector("#assign-task").addEventListener("click", event => {
     event.preventDefault();
 
@@ -298,6 +378,17 @@ function render() {
     };
 
     currentEvent = document.querySelector("#event-select").value;
+    const activityStatus = currentEvent === "task_completed" ? "completed"
+      : currentEvent === "task_blocked" ? "blocked" : "active";
+    activityLog.push({
+      id: String(Date.now()),
+      employeeId,
+      title,
+      status: activityStatus,
+      createdAt: new Date().toISOString()
+    });
+    activityLog = activityLog.slice(-100);
+    saveActivityLog();
 
     selectedEmployee = EMPLOYEE_PROFILES.find(
       person => person.id === employeeId
