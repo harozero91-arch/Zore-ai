@@ -151,16 +151,28 @@ async function handleWorkListClick(event){
 }
 async function performTaskDeletion(taskId,deleteButton){
   deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
+  const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
+  const uuidPattern=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
   let deletion;
-  try{deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);}
-  catch(err){
+  try{
+    if(uuidPattern.test(String(taskId))){
+      deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);
+    }else if(task?.title&&task?.created_at&&Number.isInteger(Number(task.employee_idx))){
+      // Some older office_sync responses may contain a non-UUID placeholder as id.
+      // Match the exact task record using its title, creation timestamp and assigned employee.
+      deletion=await supabase.from("office_tasks").delete({count:"exact"})
+        .eq("title",task.title).eq("created_at",task.created_at).eq("employee_idx",task.employee_idx);
+    }else{
+      throw new Error("ID tugas bukan UUID yang valid dan data pencocokan aman tidak lengkap. Tugas tidak dihapus.");
+    }
+  }catch(err){
     deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
     showNotice("Tugas belum terhapus: "+(err?.message||"Koneksi database gagal."),"error");return;
   }
   const {error,count}=deletion||{};
-  if(error||count===0||count==null){
+  if(error||count!==1){
     deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
-    showNotice("Tugas belum dapat dipastikan terhapus: "+(error?.message||"Database tidak mengonfirmasi penghapusan. Periksa izin CEO dan kebijakan Supabase."),"error");return;
+    showNotice("Tugas belum dapat dipastikan terhapus: "+(error?.message||(count===0?"Data tugas tidak ditemukan.":"Database tidak mengonfirmasi tepat satu tugas terhapus.")),"error");return;
   }
   officeData.tasks=officeData.tasks.filter(item=>String(item.id)!==String(taskId));
   officeData.reports=officeData.reports.filter(item=>String(item.task_id)!==String(taskId));
