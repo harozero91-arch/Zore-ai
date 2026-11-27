@@ -157,13 +157,19 @@ async function performTaskDeletion(taskId,deleteButton){
   try{
     if(uuidPattern.test(String(taskId))){
       deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);
-    }else if(task?.title&&task?.created_at&&Number.isInteger(Number(task.employee_idx))){
-      // Some older office_sync responses may contain a non-UUID placeholder as id.
-      // Match the exact task record using its title, creation timestamp and assigned employee.
-      deletion=await supabase.from("office_tasks").delete({count:"exact"})
-        .eq("title",task.title).eq("created_at",task.created_at).eq("employee_idx",task.employee_idx);
+    }else if(task?.title&&task?.instructions!=null&&Number.isInteger(Number(task.employee_idx))&&Number.isInteger(Number(task.stage_order))){
+      // Older office_sync records may expose a malformed id. Resolve the real DB UUID
+      // by an exact composite match; never delete when the match is ambiguous.
+      const {data:matches,error:lookupError}=await supabase.from("office_tasks").select("id")
+        .eq("title",task.title).eq("instructions",task.instructions)
+        .eq("employee_idx",Number(task.employee_idx)).eq("stage_order",Number(task.stage_order));
+      if(lookupError)throw lookupError;
+      if(!matches||matches.length!==1||!uuidPattern.test(String(matches[0].id))){
+        throw new Error(matches?.length>1?"Ditemukan lebih dari satu tugas yang cocok. Tidak ada data yang dihapus.":"Data tugas tidak ditemukan dengan pencocokan aman. Tidak ada data yang dihapus.");
+      }
+      deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",matches[0].id);
     }else{
-      throw new Error("ID tugas bukan UUID yang valid dan data pencocokan aman tidak lengkap. Tugas tidak dihapus.");
+      throw new Error("Data tugas belum memiliki informasi yang cukup untuk pencocokan aman. Tidak ada data yang dihapus.");
     }
   }catch(err){
     deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
