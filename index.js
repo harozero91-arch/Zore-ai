@@ -281,26 +281,26 @@ export function mountZoreVirtualOffice(host, options = {}) {
     ["Terima kasih atas bantuannya.", "Sama-sama, kerja tim membuat semuanya lebih mudah."]
   ];
   const roleTopics = {
-    "Direktur Utama": "arah strategi perusahaan",
-    "Manajer Operasional": "alur kerja tim",
-    "Programmer": "pengembangan sistem",
-    "Analis Data": "temuan data",
-    "Peneliti": "hasil riset",
-    "Desainer Kreatif": "konsep desain",
-    "Pemasaran": "kampanye pemasaran",
-    "Keuangan": "rencana anggaran",
-    "Administrasi": "jadwal dan dokumen"
+    "CEO": "arah strategi perusahaan",
+    "AI Creative Manager": "alur kerja dan kualitas tim",
+    "AI Scriptwriter": "naskah dan dialog",
+    "AI Storyboard Artist": "panel storyboard dan kamera",
+    "AI Character Designer": "desain karakter dan kostum",
+    "AI Background Artist": "latar dan atmosfer visual",
+    "AI 2D Animator": "gerakan dan timing animasi",
+    "AI Cleanup & Color Artist": "cleanup dan konsistensi warna",
+    "AI Graphic Designer & Video Editor": "aset grafis, kode, dan editing video"
   };
   const collabRoles = {
-    "Direktur Utama": ["Manajer Operasional", "Keuangan", "Analis Data"],
-    "Manajer Operasional": ["Direktur Utama", "Administrasi", "Programmer"],
-    "Programmer": ["Analis Data", "Peneliti", "Manajer Operasional"],
-    "Analis Data": ["Keuangan", "Peneliti", "Direktur Utama"],
-    "Peneliti": ["Analis Data", "Desainer Kreatif", "Programmer"],
-    "Desainer Kreatif": ["Pemasaran", "Peneliti", "Programmer"],
-    "Pemasaran": ["Desainer Kreatif", "Analis Data", "Direktur Utama"],
-    "Keuangan": ["Direktur Utama", "Analis Data", "Manajer Operasional"],
-    "Administrasi": ["Manajer Operasional", "Direktur Utama", "Keuangan"]
+    "CEO": ["AI Creative Manager"],
+    "AI Creative Manager": ["CEO", "AI Scriptwriter", "AI Storyboard Artist", "AI Character Designer", "AI Background Artist", "AI 2D Animator", "AI Cleanup & Color Artist", "AI Graphic Designer & Video Editor"],
+    "AI Scriptwriter": ["AI Storyboard Artist", "AI Creative Manager"],
+    "AI Storyboard Artist": ["AI Scriptwriter", "AI Character Designer", "AI Creative Manager"],
+    "AI Character Designer": ["AI Background Artist", "AI Storyboard Artist", "AI 2D Animator"],
+    "AI Background Artist": ["AI Character Designer", "AI 2D Animator"],
+    "AI 2D Animator": ["AI Background Artist", "AI Cleanup & Color Artist"],
+    "AI Cleanup & Color Artist": ["AI 2D Animator", "AI Graphic Designer & Video Editor"],
+    "AI Graphic Designer & Video Editor": ["AI Cleanup & Color Artist", "AI Creative Manager"]
   };
   const makeBubble = (message) => {
     const canvas = document.createElement("canvas");
