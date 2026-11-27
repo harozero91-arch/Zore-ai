@@ -264,6 +264,48 @@ export function mountZoreVirtualOffice(host, options = {}) {
   wallScreen(-20.78,3.6,-7.5,Math.PI/2,2.8,1.7);
   wallScreen(20.78,3.6,-7.5,-Math.PI/2,2.8,1.7);
 
+  // Department identity panels: make each work zone legible from the isometric camera.
+  function addDepartmentSign(x, y, z, text, rotation = 0, width = 4.6) {
+    const canvas = document.createElement("canvas");
+    canvas.width = 768; canvas.height = 180;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#211b18"; ctx.fillRect(0,0,768,180);
+    ctx.strokeStyle = "#c7a56a"; ctx.lineWidth = 8; ctx.strokeRect(9,9,750,162);
+    ctx.fillStyle = "#f4efdf"; ctx.font = "bold 42px Arial";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(text,384,90,710);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const panel = new THREE.Mesh(new THREE.PlaneGeometry(width,1.08),
+      new THREE.MeshBasicMaterial({map:texture, toneMapped:false}));
+    panel.position.set(x,y,z); panel.rotation.y=rotation; building.add(panel);
+    panel.userData.texture=texture;
+  }
+  addDepartmentSign(-12.8,4.85,-14.78,"INVESTMENT & RESEARCH");
+  addDepartmentSign(12.8,4.85,-14.78,"FINANCIAL ANALYSIS");
+  addDepartmentSign(0,3.35,-5.8,"EXECUTIVE MEETING",0,4.0);
+  addDepartmentSign(-20.78,4.7,7.0,"CEO & MANAGEMENT",Math.PI/2,4.0);
+  addDepartmentSign(20.78,4.7,7.0,"COLLABORATION LOUNGE",-Math.PI/2,4.0);
+
+  // Subtle floor inlays distinguish work, meeting, and lounge zones without blocking movement.
+  const zoneGold = material(0xb99762,0.48,0.28);
+  const zoneDark = material(0x314d4a,0.72);
+  function floorInlay(x,z,w,d,mat) {
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w,d),mat);
+    mesh.rotation.x=-Math.PI/2; mesh.position.set(x,0.245,z); building.add(mesh);
+  }
+  floorInlay(-13.2,-6.5,13.6,15.0,zoneDark);
+  floorInlay(13.2,-6.5,13.6,15.0,zoneDark);
+  floorInlay(0,1.0,13.0,12.5,zoneGold);
+  floorInlay(12.0,10.0,10.2,8.8,zoneDark);
+
+  // Executive identity wall behind reception, visible from the open entrance.
+  const executivePlaque = new THREE.Group();
+  executivePlaque.position.set(-20.78,3.1,0.0);
+  executivePlaque.rotation.y=Math.PI/2; building.add(executivePlaque);
+  box(executivePlaque,0,0,0,5.6,2.2,0.16,woodMat,false);
+  addDepartmentSign(-20.65,3.1,0.0,"ZERO AI · EXECUTIVE CAMPUS",Math.PI/2,5.0);
+
   // Ceiling is intentionally omitted so the complete interior remains visible.
   // Warm architectural lighting.
   const pendant = new THREE.PointLight(0xffd69a, 28, 28);
