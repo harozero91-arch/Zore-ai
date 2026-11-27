@@ -1,401 +1,112 @@
-
 import "./styles.css";
 import "../office.css";
 import { mountZoreVirtualOffice } from "../index.js";
+import { createClient } from "@supabase/supabase-js";
+import { EMPLOYEE_PROFILES, ORG_DEPARTMENTS, getCharacterState, getCollaborators } from "./employee-character-system.js";
 
-import {
-  EMPLOYEE_PROFILES,
-  getCharacterState,
-  getCollaborators
-} from "./employee-character-system.js";
-
-const app = document.querySelector("#app");
-
-let selectedEmployee = EMPLOYEE_PROFILES[0];
-
-let currentTask = {
-  title: "Menunggu tugas",
-  description: ""
-};
-
-let currentEvent = "";
-let taskDraft = "";
-let officeInstance = null;
-const ACTIVITY_STORAGE_KEY = "zore-ai-activity-log";
-
-function loadActivityLog() {
-  try {
-    const saved = JSON.parse(localStorage.getItem(ACTIVITY_STORAGE_KEY) || "[]");
-    return Array.isArray(saved) ? saved : [];
-  } catch {
-    return [];
-  }
+const app=document.querySelector("#app");
+const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY=import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabase=SUPABASE_URL&&SUPABASE_KEY?createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
+const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmt=v=>v?new Date(v).toLocaleString("id-ID",{dateStyle:"short",timeStyle:"short"}):"—";
+const employeeByIdx=idx=>EMPLOYEE_PROFILES.find(e=>e.idx===Number(idx));
+const statusLabel={queued:"Dalam antrean",in_progress:"Sedang dikerjakan",submitted:"Menunggu pemeriksaan",revision:"Perlu revisi",approved:"Disetujui",failed:"Gagal"};
+function showNotice(message,type="info"){
+  const el=document.querySelector("#global-notice"); if(el){el.textContent=message;el.className="notice "+type;el.hidden=false;}
 }
-
-let activityLog = loadActivityLog();
-
-function saveActivityLog() {
-  try {
-    localStorage.setItem(ACTIVITY_STORAGE_KEY, JSON.stringify(activityLog));
-  } catch (error) {
-    console.warn("Riwayat aktivitas tidak dapat disimpan:", error);
-  }
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, character => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
-  })[character]);
-}
-
-function renderActivityMonitor() {
-  const active = activityLog.filter(item => item.status === "active").length;
-  const completed = activityLog.filter(item => item.status === "completed").length;
-  const blocked = activityLog.filter(item => item.status === "blocked").length;
-
-  const rows = activityLog.length
-    ? activityLog.slice().reverse().map(item => {
-        const employee = EMPLOYEE_PROFILES.find(person => person.id === item.employeeId);
-        const statusText = item.status === "completed" ? "Selesai (manual)"
-          : item.status === "blocked" ? "Terhambat" : "Aktivitas visual aktif";
-        const resultText = item.status === "completed"
-          ? "Ditandai selesai oleh operator."
-          : item.status === "blocked"
-            ? "Menunggu tindak lanjut operator."
-            : "Belum ada hasil otomatis. Tugas AI/backend belum terhubung.";
-        const progress = item.status === "completed" ? 100 : 0;
-        return '<article class="activity-item">' +
-          '<div class="activity-item-top"><div><span class="activity-employee">' +
-          escapeHtml(employee?.name || "Karyawan") + '</span><h4>' + escapeHtml(item.title) +
-          '</h4></div><span class="activity-status ' + item.status + '">' + statusText + '</span></div>' +
-          '<p class="activity-role">' + escapeHtml(employee?.role || "") + ' · ' +
-          new Date(item.createdAt).toLocaleString("id-ID") + '</p>' +
-          '<div class="activity-progress-label"><span>Progres tercatat</span><strong>' + progress +
-          '%</strong></div><div class="activity-progress"><span style="width:' + progress +
-          '%"></span></div><p class="activity-result">' + resultText + '</p>' +
-          (item.status !== "completed" ? '<button class="activity-complete" data-complete="' +
-          escapeHtml(item.id) + '">Tandai selesai manual</button>' : '') + '</article>';
-      }).join("")
-    : '<p class="activity-empty">Belum ada tugas. Berikan tugas melalui panel di atas untuk mulai memantau aktivitas.</p>';
-
-  return '<section class="activity-monitor" id="activity-monitor">' +
-    '<div class="activity-heading"><div><span class="activity-kicker">LIVE WORKSPACE</span>' +
-    '<h2>Pusat Pemantauan Aktivitas</h2><p>Pantau penugasan dan status yang tercatat di perangkat ini.</p></div>' +
-    '<span class="activity-live"><i></i> PEMANTAUAN AKTIF</span></div>' +
-    '<div class="activity-stats"><div><strong>' + activityLog.length + '</strong><span>Total tugas</span></div>' +
-    '<div><strong>' + active + '</strong><span>Aktif</span></div><div><strong>' + completed +
-    '</strong><span>Selesai</span></div><div><strong>' + blocked + '</strong><span>Terhambat</span></div></div>' +
-    '<div class="activity-list">' + rows + '</div>' +
-    '<p class="activity-disclaimer">Catatan: riwayat disimpan di browser perangkat ini. Progres 0% berarti belum ada eksekusi kerja yang terukur; AI/backend belum menjalankan tugas secara otomatis. Status selesai hanya berubah jika operator menandainya.</p></section>';
-}
-
-function renderEmployee(employee) {
-  const state = getCharacterState(
-    employee.id,
-    currentTask,
-    currentEvent
-  );
-
-  return `
-    <article class="employee-card"
-      style="--accent:${employee.accent}"
-      data-id="${employee.id}">
-
-      <div class="character-stage">
-        <div class="character ${state.activity}">
-          <div class="character-shadow"></div>
-          <div class="character-body">
-            <div class="character-head">
-              <div class="hair"></div>
-              <div class="eyes">
-                <span></span><span></span>
-              </div>
-              <div class="mouth"></div>
-            </div>
-            <div class="character-torso"></div>
-            <div class="character-arm left"></div>
-            <div class="character-arm right"></div>
-            <div class="character-legs"></div>
-          </div>
-        </div>
-        <span class="mood">${state.mood}</span>
-      </div>
-
-      <div class="employee-info">
-        <h3>${employee.name}</h3>
-        <p>${employee.role}</p>
-
-        <span class="employee-traits">
-          ${employee.traits.join(" · ")}
-        </span>
-
-        <div class="employee-status">
-          <span class="status-dot"></span>
-          ${state.activity}
-        </div>
-
-        <button class="detail-button"
-          data-select="${employee.id}">
-          Lihat profil
-        </button>
-      </div>
-    </article>
-  `;
-}
-
-function renderProfile(employee) {
-  const collaborators = getCollaborators(employee.id);
-
-  return `
-    <div class="profile-content">
-      <div class="profile-heading">
-        <span>PROFIL KARYAWAN</span>
-        <h2>${employee.name}</h2>
-        <p>${employee.role}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Kepribadian</h3>
-        <p>${employee.traits.join(", ")}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Keahlian</h3>
-        <p>${employee.skills.join(", ")}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Ciri khas</h3>
-        <p>${employee.signature}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Pakaian</h3>
-        <p>${employee.outfit}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Aksesori</h3>
-        <p>${employee.accessory}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Gaya komunikasi</h3>
-        <p>${employee.communication}</p>
-      </div>
-
-      <div class="profile-section">
-        <h3>Rekan kolaborasi</h3>
-        <p>${collaborators.map(item => item.name).join(", ")}</p>
-      </div>
-    </div>
-  `;
-}
-
-function selectEmployee(employeeId) {
-  const employee = EMPLOYEE_PROFILES.find(
-    person => person.id === employeeId
-  );
-
-  if (!employee) return;
-
-  selectedEmployee = employee;
-
-  const profilePanel = document.querySelector("#profile-panel");
-
-  if (profilePanel) {
-    profilePanel.innerHTML = renderProfile(employee);
-  }
-}
-
-function connectVirtualOffice() {
-  const host = document.querySelector("#zore-office-mount");
-
-  if (!host) {
-    console.error("Tempat kantor virtual 3D tidak ditemukan.");
-    return;
-  }
-
-  try {
-    officeInstance = mountZoreVirtualOffice(host, {
-      employees: EMPLOYEE_PROFILES,
-
-      onEmployeeSelect: employee => {
-        selectEmployee(employee.id);
-      },
-
-      onRoomChange: room => {
-        console.info("Ruangan aktif:", room.name);
-      }
-    });
-  } catch (error) {
-    console.error("Kantor virtual gagal dimuat:", error);
-    host.innerHTML = `
-      <p style="padding:20px;color:#8b2d20">
-        Kantor 3D gagal dimuat. Periksa koneksi dan dukungan WebGL.
-      </p>
-    `;
-  }
-}
-
-function render() {
-  if (officeInstance) {
-    officeInstance.destroy();
-    officeInstance = null;
-  }
-
-  app.innerHTML = `
-    <header class="topbar">
-      <div>
-        <span class="eyebrow">
-          VIRTUAL MANAGEMENT SYSTEM
-        </span>
-
-        <h1>ZORE <span>AI</span></h1>
-        <p>Kantor Virtual Cerdas</p>
-      </div>
-
-      <div class="office-indicator">
-        <span></span> KANTOR AKTIF
-      </div>
-    </header>
-
-    <main>
-      <section class="office-intro">
-        <span>EXECUTIVE OFFICE</span>
-
-        <h2>Selamat datang di kantor ZORE</h2>
-
-        <p>
-          Sembilan karakter karyawan dengan peran
-          dan kepribadian berbeda.
-        </p>
-      </section>
-
-      <section class="virtual-office-section">
-        <div id="zore-office-mount"></div>
-      </section>
-
-      <section class="task-panel">
-        <h3>Berikan tugas kepada karyawan</h3>
-
-        <input
-          id="task-input"
-          value="${taskDraft.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"
-          placeholder="Contoh: Menganalisis data perusahaan"
-          autocomplete="off"
-        >
-
-        <select id="employee-select">
-          ${EMPLOYEE_PROFILES.map(person => `
-            <option value="${person.id}">
-              ${person.name} — ${person.role}
-            </option>
-          `).join("")}
-        </select>
-
-        <select id="event-select">
-          <option value="task_started">Mulai tugas</option>
-          <option value="task_completed">Tugas selesai</option>
-          <option value="idea_discovered">Menemukan ide</option>
-          <option value="task_blocked">Tugas terhambat</option>
-          <option value="positive_feedback">Umpan balik positif</option>
-        </select>
-
-        <button id="assign-task" type="button">
-          Jalankan aktivitas
-        </button>
-      </section>
-
-      ${renderActivityMonitor()}
-
-      <section class="team-section">
-        <div class="section-heading">
-          <div>
-            <span>OUR TEAM</span>
-            <h2>Tim Karyawan</h2>
-          </div>
-
-          <span>09 PERSONEL</span>
-        </div>
-
-        <div class="employee-grid">
-          ${EMPLOYEE_PROFILES.map(renderEmployee).join("")}
-        </div>
-      </section>
-
-      <section class="profile-panel" id="profile-panel">
-        ${renderProfile(selectedEmployee)}
-      </section>
-    </main>
-
-    <footer>
-      ZORE AI · VIRTUAL OFFICE SYSTEM
-    </footer>
-  `;
-
-  connectVirtualOffice();
-
-  document.querySelectorAll("[data-select]").forEach(button => {
-    button.addEventListener("click", () => {
-      selectEmployee(button.dataset.select);
-    });
+function renderAuth(message=""){
+  if(officeInstance){officeInstance.destroy();officeInstance=null;}
+  app.innerHTML=`<main class="auth-shell"><section class="auth-card"><div class="auth-brand">ZORE <span>AI</span></div><p class="eyebrow">WORKFORCE MANAGEMENT</p><h1>Masuk ke kantor ZORE AI</h1><p class="auth-copy">Gunakan akun pemilik yang terhubung dengan data karyawan dan riwayat pekerjaan ZORE AI.</p><form id="auth-form"><label>Email<input id="auth-email" type="email" autocomplete="username" required placeholder="Email akun"></label><label>Kata sandi<input id="auth-password" type="password" autocomplete="current-password" required minlength="6" placeholder="Kata sandi"></label><button class="primary" type="submit">Masuk</button><button class="secondary" id="signup-button" type="button">Buat akun baru</button><p id="auth-message" class="auth-message">${esc(message)}</p></form><p class="auth-foot">Akun baru akan memiliki ruang kerja kosong. Untuk membuka data karyawan dan pekerjaan yang sudah ada, masuk menggunakan akun pemilik lama.</p></section></main>`;
+  document.querySelector("#auth-form").addEventListener("submit",async e=>{
+    e.preventDefault(); const email=document.querySelector("#auth-email").value.trim(); const password=document.querySelector("#auth-password").value;
+    const button=e.currentTarget.querySelector("button[type=submit]"); button.disabled=true; button.textContent="Memeriksa akun…";
+    const {error}=await supabase.auth.signInWithPassword({email,password});
+    if(error){document.querySelector("#auth-message").textContent=error.message;button.disabled=false;button.textContent="Masuk";}
   });
-
-  const taskInput = document.querySelector("#task-input");
-
-  taskInput.addEventListener("input", event => {
-    taskDraft = event.target.value;
-  });
-
-  document.querySelector("#activity-monitor").addEventListener("click", event => {
-    const button = event.target.closest("[data-complete]");
-    if (!button) return;
-    const item = activityLog.find(entry => entry.id === button.dataset.complete);
-    if (!item) return;
-    item.status = "completed";
-    item.completedAt = new Date().toISOString();
-    saveActivityLog();
-    render();
-  });
-
-  document.querySelector("#assign-task").addEventListener("click", event => {
-    event.preventDefault();
-
-    const title = (taskInput.value || taskDraft || "").trim();
-    const employeeId = document.querySelector("#employee-select").value;
-
-    if (!title) {
-      alert("Masukkan tugas terlebih dahulu.");
-      taskInput.focus();
-      return;
-    }
-
-    taskDraft = "";
-    currentTask = {
-      title,
-      description: ""
-    };
-
-    currentEvent = document.querySelector("#event-select").value;
-    const activityStatus = currentEvent === "task_completed" ? "completed"
-      : currentEvent === "task_blocked" ? "blocked" : "active";
-    activityLog.push({
-      id: String(Date.now()),
-      employeeId,
-      title,
-      status: activityStatus,
-      createdAt: new Date().toISOString()
-    });
-    activityLog = activityLog.slice(-100);
-    saveActivityLog();
-
-    selectedEmployee = EMPLOYEE_PROFILES.find(
-      person => person.id === employeeId
-    ) || EMPLOYEE_PROFILES[0];
-
-    render();
+  document.querySelector("#signup-button").addEventListener("click",async()=>{
+    const email=document.querySelector("#auth-email").value.trim(); const password=document.querySelector("#auth-password").value;
+    if(!email||password.length<6){document.querySelector("#auth-message").textContent="Isi email dan kata sandi minimal 6 karakter terlebih dahulu.";return;}
+    const {error,data}=await supabase.auth.signUp({email,password});
+    document.querySelector("#auth-message").textContent=error?error.message:(data.session?"Akun dibuat. Menyiapkan kantor…":"Akun dibuat. Periksa email untuk konfirmasi, lalu masuk.");
   });
 }
-
-render();
+function renderOrganization(){
+  const card=id=>{const e=EMPLOYEE_PROFILES.find(x=>x.id===id);if(!e)return "";const isBoss=e.level===0;return `<article class="org-person level-${e.level}" style="--accent:${e.accent}"><span class="org-dept">${esc(e.department)}</span><strong>${esc(e.name)}</strong><span>${esc(e.title)}</span><small>${isBoss?"Pimpinan perusahaan":e.level===1?"Melapor kepada Direktur Utama":"Melapor kepada Manajer Kreatif"}</small><button type="button" data-org-profile="${e.id}">Lihat tanggung jawab</button></article>`;};
+  return `<section class="org-section"><div class="section-heading"><div><span>ORGANIZATION CHART</span><h2>Struktur Organisasi Karyawan</h2></div><span>09 PERSONEL · 07 UNIT</span></div><div class="org-tree"><div class="org-top">${card("office-employee-0")}</div><div class="org-connector"></div><div class="org-manager">${card("office-employee-1")}</div><div class="org-connector"></div><div class="org-departments">${ORG_DEPARTMENTS.filter(d=>!["Direksi","Manajemen Operasional"].includes(d.name)).map(d=>`<div class="org-unit"><h3>${esc(d.name)}</h3><p>${esc(d.description)}</p><div>${d.members.map(card).join("")}</div></div>`).join("")}</div></div></section>`;
+}
+function renderProfile(employee){
+  const colleagues=getCollaborators(employee.id);
+  return `<div class="profile-heading"><span>PROFIL DAN TANGGUNG JAWAB</span><h2>${esc(employee.name)}</h2><p>${esc(employee.title)} · ${esc(employee.department)}</p></div><div class="profile-grid"><div><h3>Misi jabatan</h3><p>${esc(employee.signature)}.</p></div><div><h3>Keahlian utama</h3><p>${employee.skills.map(esc).join(" · ")}</p></div><div><h3>Melapor kepada</h3><p>${employee.reportsTo?esc(EMPLOYEE_PROFILES.find(e=>e.id===employee.reportsTo)?.name):"Pemilik / pemegang keputusan tertinggi"}</p></div><div><h3>Rekan kolaborasi</h3><p>${colleagues.map(e=>esc(e.name)).join(", ")||"Koordinasi langsung dengan tim."}</p></div><div><h3>Batas kewenangan</h3><p>Menjalankan pekerjaan sesuai jabatan, menyerahkan hasil untuk pemeriksaan manajer, dan tidak menyetujui pengeluaran atau tindakan eksternal tanpa persetujuan pemilik.</p></div></div>`;
+}
+function taskCard(task){
+  const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
+  const results=resultRows.filter(r=>r.task_id===task.id).sort((a,b)=>b.version-a.version);
+  const report=officeData.reports.find(r=>r.task_id===task.id&&r.kind==="final");
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${results.length?'<details class="result-details"><summary>Lihat hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${report?'<p class="manager-report"><strong>Laporan:</strong> '+esc(report.body)+'</p>':""}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}</article>`;
+}
+function renderWorkspace(){
+  if(officeInstance){officeInstance.destroy();officeInstance=null;}
+  app.innerHTML=`<header class="topbar"><div><span class="eyebrow">VIRTUAL MANAGEMENT SYSTEM</span><h1>ZORE <span>AI</span></h1><p>Kantor Virtual · Sistem Kerja AI</p></div><div class="top-actions"><span class="signed-in">${esc(currentUser.email||"Pemilik")}</span><button id="signout" class="secondary">Keluar</button></div></header><main><section class="office-intro"><span>EXECUTIVE OFFICE</span><h2>Organisasi dan ruang kerja ZORE AI</h2><p>Setiap karyawan memiliki jabatan, tanggung jawab, alur pelaporan, dan hasil pekerjaan yang tercatat.</p></section><section class="virtual-office-section"><div id="zore-office-mount"></div></section>${renderOrganization()}<section class="profile-panel" id="profile-panel">${renderProfile(selectedEmployee)}</section><section class="task-panel" id="task-panel"><div class="section-heading"><div><span>AI WORK QUEUE</span><h2>Berikan pekerjaan nyata</h2></div><span>AI WORKER AKTIF</span></div><p class="panel-copy">Tugas akan dikirim ke antrean server. Manajer AI membagi pekerjaan ke spesialis, setiap tahap menghasilkan keluaran AI, lalu hasil akhir menunggu persetujuan Anda.</p><form id="task-form"><label>Judul pekerjaan<input id="task-title" maxlength="200" required placeholder="Contoh: Buat naskah animasi edukasi 60 detik"></label><label>Instruksi dan kriteria hasil<textarea id="task-instructions" maxlength="4000" rows="4" placeholder="Jelaskan tujuan, format, audiens, bahan, dan hasil yang diharapkan."></textarea></label><div class="task-form-row"><label>Penanggung jawab awal<select id="task-employee">${EMPLOYEE_PROFILES.filter(e=>e.idx>0).map(e=>'<option value="'+e.idx+'" '+(e.idx===1?"selected":"")+'>'+esc(e.name)+' — '+esc(e.title)+'</option>').join("")}</select></label><label>Estimasi menit<input id="task-estimate" type="number" min="1" max="1440" value="30"></label></div><button class="primary" type="submit">Kirim ke sistem kerja AI</button><p id="task-message" class="auth-message"></p></form></section><section class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div><div class="work-stats"><div><strong>${officeData.tasks.filter(t=>["queued","in_progress","revision"].includes(t.status)).length}</strong><span>Antrean / berjalan</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="submitted").length}</strong><span>Menunggu tinjauan</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="approved").length}</strong><span>Disetujui</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="failed").length}</strong><span>Gagal</span></div></div><div class="work-list">${officeData.tasks.length?officeData.tasks.map(taskCard).join(""):'<p class="empty-state">Belum ada pekerjaan. Kirim pekerjaan pertama melalui formulir di atas.</p>'}</div></section><section class="activity-feed"><h2>Aktivitas dan laporan tim</h2>${officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>'}</section><div id="global-notice" class="notice" hidden></div></main><footer>ZORE AI · AI EMPLOYEE WORKSPACE</footer>`;
+  const host=document.querySelector("#zore-office-mount");
+  try{officeInstance=mountZoreVirtualOffice(host,{employees:EMPLOYEE_PROFILES,onEmployeeSelect:employee=>selectEmployee(employee.id)});}catch(e){host.innerHTML='<p class="empty-state">Tampilan 3D tidak dapat dimuat. Panel kerja tetap tersedia.</p>';console.error(e);}
+  document.querySelector("#signout").addEventListener("click",async()=>{await supabase.auth.signOut();});
+  document.querySelectorAll("[data-org-profile]").forEach(b=>b.addEventListener("click",()=>selectEmployee(b.dataset.orgProfile)));
+  document.querySelector("#profile-panel").addEventListener("click",()=>{});
+  document.querySelector("#task-form").addEventListener("submit",assignTask);
+  document.querySelector("#refresh-work").addEventListener("click",()=>syncOffice(true));
+  document.querySelector(".work-list").addEventListener("click",handleReview);
+}
+function selectEmployee(id){selectedEmployee=EMPLOYEE_PROFILES.find(e=>e.id===id)||EMPLOYEE_PROFILES[0];const panel=document.querySelector("#profile-panel");if(panel)panel.innerHTML=renderProfile(selectedEmployee);}
+async function syncOffice(redraw=false){
+  if(!supabase||!currentUser)return;
+  const {data,error}=await supabase.rpc("office_sync");
+  if(error){showNotice("Gagal membaca ruang kerja: "+error.message,"error");return;}
+  officeData={tasks:data?.tasks||[],reports:data?.reports||[],activity:data?.activity||[]};
+  const ids=officeData.tasks.map(t=>t.id).filter(Boolean);
+  if(ids.length){const {data:rows,error:resultError}=await supabase.from("office_task_results").select("id,task_id,version,content,model,created_at").in("task_id",ids).order("version",{ascending:false});if(!resultError)resultRows=rows||[];}
+  else resultRows=[];
+  if(redraw)renderWorkspace();
+  else {
+    const monitor=document.querySelector(".work-monitor");
+    if(monitor){const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();monitor.replaceWith(temp.querySelector(".work-monitor"));}
+  }
+}
+function renderWorkspaceSnapshot(){
+  return '<section class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div><div class="work-stats"><div><strong>'+officeData.tasks.filter(t=>["queued","in_progress","revision"].includes(t.status)).length+'</strong><span>Antrean / berjalan</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="submitted").length+'</strong><span>Menunggu tinjauan</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="approved").length+'</strong><span>Disetujui</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="failed").length+'</strong><span>Gagal</span></div></div><div class="work-list">'+(officeData.tasks.length?officeData.tasks.map(taskCard).join(""):'<p class="empty-state">Belum ada pekerjaan.</p>')+'</div></section>';
+}
+async function assignTask(event){
+  event.preventDefault();const button=event.currentTarget.querySelector("button[type=submit]");const msg=document.querySelector("#task-message");
+  const title=document.querySelector("#task-title").value.trim(),instructions=document.querySelector("#task-instructions").value.trim(),idx=Number(document.querySelector("#task-employee").value),est=Number(document.querySelector("#task-estimate").value);
+  if(!title)return;button.disabled=true;button.textContent="Mengirim pekerjaan…";msg.textContent="";
+  const {data,error}=await supabase.rpc("office_assign_task",{p_idx:idx,p_title:title,p_instr:instructions,p_est:est});
+  button.disabled=false;button.textContent="Kirim ke sistem kerja AI";
+  if(error){msg.textContent="Pekerjaan gagal dikirim: "+error.message;return;}
+  msg.textContent="Pekerjaan masuk antrean server. Worker AI akan mengambilnya otomatis.";
+  event.currentTarget.reset();document.querySelector("#task-estimate").value=30;
+  await syncOffice(true);showNotice("Tugas berhasil masuk antrean. Pantau tahap kerja dan hasil AI di bawah.","success");
+}
+async function handleReview(event){
+  const approve=event.target.closest("[data-approve]"),revise=event.target.closest("[data-revise]");if(!approve&&!revise)return;
+  const id=approve?.dataset.approve||revise?.dataset.revise;let note=null,ok=!!approve;
+  if(!ok){note=prompt("Tuliskan bagian yang harus diperbaiki:");if(note===null)return;}
+  const {error}=await supabase.rpc("office_review_task",{p_task:id,p_approve:ok,p_note:note});
+  if(error){showNotice("Tinjauan gagal disimpan: "+error.message,"error");return;}
+  await syncOffice(true);showNotice(ok?"Hasil disetujui.":"Revisi dikirim kembali ke antrean.","success");
+}
+async function enterWorkspace(user){
+  currentUser=user;
+  const {error}=await supabase.rpc("office_sync");
+  if(error){renderAuth("Akun masuk, tetapi ruang kerja belum dapat dibuka: "+error.message);return;}
+  await syncOffice(false);renderWorkspace();
+  if(syncTimer)clearInterval(syncTimer);
+  syncTimer=setInterval(()=>syncOffice(false),20000);
+}
+async function boot(){
+  if(!supabase){renderAuth("Konfigurasi koneksi belum tersedia. Periksa pengaturan proyek.");return;}
+  const {data:{session}}=await supabase.auth.getSession();
+  if(session?.user)await enterWorkspace(session.user);else renderAuth();
+  supabase.auth.onAuthStateChange((_event,session)=>{if(session?.user){if(!currentUser||currentUser.id!==session.user.id)enterWorkspace(session.user);}else{currentUser=null;if(syncTimer)clearInterval(syncTimer);renderAuth();}});
+}
+boot();
