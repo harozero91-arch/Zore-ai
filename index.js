@@ -809,13 +809,29 @@ export function mountZoreVirtualOffice(host, options = {}) {
           const step = Math.min(distance, data.speed * 0.016);
           const nextX = o.position.x + delta.x * step;
           const nextZ = o.position.z + delta.z * step;
-          // Stop before entering furniture or walls; pick a clear alternate route.
+          // Slide along a clear axis when a direct route is blocked. This preserves
+          // the reserved desk/meeting destination instead of sending the employee elsewhere.
+          const clearX = !hitsSolidArea(nextX,o.position.z) && !hitsAnotherEmployee(nextX,o.position.z,o);
+          const clearZ = !hitsSolidArea(o.position.x,nextZ) && !hitsAnotherEmployee(o.position.x,nextZ,o);
           if (!hitsSolidArea(nextX,nextZ) && !hitsAnotherEmployee(nextX,nextZ,o)) {
             o.position.x = nextX;
             o.position.z = nextZ;
-            o.rotation.y = Math.atan2(delta.x, delta.z);
-          } else if (!data.partner) {
+          } else if (clearX && Math.abs(delta.x) >= Math.abs(delta.z)) {
+            o.position.x = nextX;
+          } else if (clearZ) {
+            o.position.z = nextZ;
+          } else if (clearX) {
+            o.position.x = nextX;
+          } else if (!data.partner && data.state === "walking") {
             chooseWalkTarget(o);
+          }
+          if (o.position.x !== nextX || o.position.z !== nextZ) {
+            // Keep the character facing the direction of actual travel.
+            const movedX = o.position.x - (nextX - delta.x * step);
+            const movedZ = o.position.z - (nextZ - delta.z * step);
+            if (Math.hypot(movedX,movedZ)>0.001) o.rotation.y = Math.atan2(movedX,movedZ);
+          } else {
+            o.rotation.y = Math.atan2(delta.x, delta.z);
           }
         }
         if(!data.seated && data.state!=="chatting")o.position.y=0.12+(moving?Math.abs(Math.sin(now*0.009+data.phase))*0.045:Math.sin(now*0.002+data.phase)*0.018);
