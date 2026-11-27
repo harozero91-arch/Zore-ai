@@ -291,6 +291,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
       [10.7,-11.2],[16.5,-11.2],[10.7,-2.1],[16.5,-2.1],
       [-5.4,-11.2],[0,-11.2],[5.4,-11.2]].map(([x,z]) =>
         ({ minX:x-1.55,maxX:x+1.55,minZ:z-0.9,maxZ:z+0.9 })),
+    // Rolling desk chairs behind the workstations.
+    ...[[-16.5,-11.2,1],[-10.7,-11.2,1],[-16.5,-2.1,1],[-10.7,-2.1,1],
+      [10.7,-11.2,-1],[16.5,-11.2,-1],[10.7,-2.1,-1],[16.5,-2.1,-1],
+      [-5.4,-11.2,1],[0,-11.2,1],[5.4,-11.2,1]]
+      .map(([x,z,side])=>({circleX:x,circleZ:z+side*1.35,radius:0.72})),
     // Meeting table and individual meeting chairs
     { circleX: 0, circleZ: 1, radius: 2.95 },
     ...Array.from({length:8},(_,i)=>({circleX:Math.cos(i*Math.PI/4)*3.45,circleZ:1+Math.sin(i*Math.PI/4)*3.45,radius:0.72})),
