@@ -1,13 +1,11 @@
 import "./styles.css";
 import "../office.css";
 import { mountZoreVirtualOffice } from "../index.js";
-import { createClient } from "@supabase/supabase-js";
+import { supabase } from "./supabase.js";
 import { EMPLOYEE_PROFILES, ORG_DEPARTMENTS, getCharacterState, getCollaborators } from "./employee-character-system.js";
 
 const app=document.querySelector("#app");
-const SUPABASE_URL=import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY=import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase=SUPABASE_URL&&SUPABASE_KEY?createClient(SUPABASE_URL,SUPABASE_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}}):null;
+
 let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>v?new Date(v).toLocaleString("id-ID",{dateStyle:"short",timeStyle:"short"}):"—";
