@@ -122,3 +122,25 @@
     top: 62px;
   }
 }
+
+.zore-office__social-status {
+  position: absolute;
+  z-index: 3;
+  left: 16px;
+  bottom: 44px;
+  padding: 8px 11px;
+  border: 1px solid #c5a36b;
+  border-radius: 8px;
+  color: #e7f5df;
+  background: #203b2ddd;
+  font-size: 11px;
+  pointer-events: none;
+}
+@media(max-width:700px) {
+  .zore-office__social-status {
+    left: 12px;
+    bottom: 42px;
+    max-width: calc(100% - 24px);
+    font-size: 10px;
+  }
+}
