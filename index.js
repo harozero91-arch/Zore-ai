@@ -498,6 +498,32 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const choices=personalityDialogue[role]||[["Aku sedang mengerjakan "+(roleTopics[role]||"tugas tim")+". Ada masukan?","Aku akan bantu cek dari sisi "+(roleTopics[second.userData.employee.role]||"pekerjaan")+"."]];
     return choices[Math.floor(Math.random()*choices.length)];
   }
+  // Autonomous desk-work schedule: employees periodically sit, type and review work.
+  const deskSeats = [
+    {x:-16.5,z:-9.85,yaw:Math.PI},{x:-10.7,z:-9.85,yaw:Math.PI},
+    {x:-16.5,z:-0.75,yaw:Math.PI},{x:-10.7,z:-0.75,yaw:Math.PI},
+    {x:10.7,z:-12.55,yaw:0},{x:16.5,z:-12.55,yaw:0},
+    {x:10.7,z:-3.45,yaw:0},{x:16.5,z:-3.45,yaw:0},
+    {x:-5.4,z:-9.85,yaw:Math.PI},{x:0,z:-9.85,yaw:Math.PI},{x:5.4,z:-9.85,yaw:Math.PI}
+  ];
+  let nextWorkActivity=12;
+  function sendEmployeeToDesk(person,now){
+    const seat=deskSeats[Math.floor(Math.random()*deskSeats.length)];
+    person.userData.seat={...seat};
+    person.userData.state="going_to_desk";
+    person.userData.partner=null;
+    person.userData.spoke=false;
+    setSeatedPose(person,false);
+    person.userData.target.set(seat.x,0.12,seat.z);
+    person.userData.workUntil=now+THREE.MathUtils.randFloat(14000,23000);
+  }
+  function startDeskActivity(now){
+    const available=employeeObjects.filter(p=>!p.userData.partner&&!p.userData.seated&&p.userData.state==="walking");
+    if(!available.length)return;
+    const person=available[Math.floor(Math.random()*available.length)];
+    sendEmployeeToDesk(person,now);
+    nextWorkActivity=now+THREE.MathUtils.randFloat(9000,15000);
+  }
   const socialState = { nextAt: 5, pair: null, until: 0 };
   function beginConversation(now) {
     if(employeeObjects.length<2)return;
@@ -672,6 +698,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const now = performance.now();
     if (!reducedMotion) {
       if (!socialState.pair && now >= socialState.nextAt) beginConversation(now);
+      if(!socialState.pair && now>=nextWorkActivity)startDeskActivity(now);
       if (socialState.pair) {
         const [a, b] = socialState.pair;
         if (now > socialState.until) {
@@ -699,7 +726,16 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
         if (distance < 0.35 && !data.partner) chooseWalkTarget(o);
-        const moving = distance > 0.18 && data.state!=="chatting";
+        if(data.state==="going_to_desk" && distance<0.35 && data.seat){
+          o.position.set(data.seat.x,0.5,data.seat.z);
+          o.rotation.y=data.seat.yaw;
+          setSeatedPose(o,true);
+          data.state="working";
+        }
+        if(data.state==="working" && now>data.workUntil){
+          setSeatedPose(o,false);data.seat=null;data.state="walking";chooseWalkTarget(o);
+        }
+        const moving = distance > 0.18 && data.state!=="chatting" && data.state!=="working";
         if (moving) {
           delta.normalize();
           const step = Math.min(distance, data.speed * 0.016);
@@ -718,6 +754,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
         if(!data.seated){
           data.legs.forEach((leg,index)=>{leg.rotation.x=moving?Math.sin(now*0.012+data.phase+index*Math.PI)*0.55:0;});
           data.arms.forEach((arm,index)=>{arm.rotation.x=moving?-Math.sin(now*0.012+data.phase+index*Math.PI)*0.38:Math.sin(now*0.002+data.phase)*0.06;});
+        }else if(data.state==="working"){
+          data.arms.forEach((arm,index)=>{
+            arm.rotation.x=-0.45+Math.sin(now*0.012+data.phase+index*1.7)*0.12;
+            arm.rotation.z=(index===0?-0.08:0.08)+Math.sin(now*0.009+data.phase)*0.035;
+          });
+          data.head.rotation.x=0.08+Math.sin(now*0.003+data.phase)*0.025;
         }else{
           data.arms.forEach((arm,index)=>{arm.rotation.z=(index===0?-0.12:0.12)+Math.sin(now*0.004+data.phase)*0.08;});
         }
