@@ -49,7 +49,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   scene.background = new THREE.Color(0xd8d0c1);
   scene.fog = new THREE.Fog(0xd8d0c1, 65, 115);
   const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180);
-  camera.position.set(35, 31, 39);
+  camera.position.set(38, 40, 43);
   camera.lookAt(0, 1.5, 0);
 
   const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
@@ -172,7 +172,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     addMonitor(x - 0.25 * Math.cos(rotation), z - 0.25 * Math.sin(rotation), rotation, 0.85);
     // Keyboard and desk accessories.
     box(group, 0.35, 1.045, 0.48, 0.72, 0.035, 0.24, darkMat, false);
-    const mug = cylinder(group, -width / 2 + 0.45, 1.12, 0.42, 0.12, 0.12, 0.18, ivoryMat);
+    const mug = cylinder(group, -width / 2 + 0.45, 1.12, 0.42, 0.12, 0.12, 0.18, wallMat);
     mug.rotation.z = 0;
     // Rolling chair behind the desk.
     const chair = new THREE.Group(); chair.position.set(0, 0, 1.35); group.add(chair);
@@ -276,7 +276,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
 
   // Living employee agents: distinct appearance, autonomous walking and social conversations.
   const employeeObjects = [];
-  const walkBounds = { minX: -17, maxX: 17, minZ: -11, maxZ: 11 };
+  const walkBounds = { minX: -18, maxX: 18, minZ: -12, maxZ: 12 };
   const dialogueLines = [
     ["Bagaimana perkembangan tugasmu?", "Sudah berjalan. Aku sedang memeriksa detailnya."],
     ["Aku punya ide untuk proyek ini.", "Menarik. Coba jelaskan, kita kembangkan bersama."],
@@ -326,8 +326,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
   };
   employees.slice(0, 9).forEach((employee, i) => {
     const group = new THREE.Group();
-    const staffX = (i % 3 - 1) * 10;
-    const staffZ = Math.floor(i / 3) * 8 - 7 + 1.8;
+    const staffSpots = [[-16,-12],[-10,-2],[-16,-2],[-10,-12],[10,-12],[16,-12],[10,-2],[16,-2],[-5,-7]];
+    const [staffX, staffZ] = staffSpots[i] || [0,0];
     group.position.set(staffX, 0.12, staffZ);
     const outfitColor = employee.accent || (i % 2 ? "#345c50" : "#70513a");
     const bodyMat = material(new THREE.Color(outfitColor), 0.58, 0.04);
