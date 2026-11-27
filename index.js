@@ -584,8 +584,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
     if(employeeObjects.length<2)return;
     const firstIndex=Math.floor(Math.random()*employeeObjects.length);
     const first=employeeObjects[firstIndex];
-    const eligible=employeeObjects.filter((candidate,index)=>index!==firstIndex&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
-    const second=eligible.length?eligible[Math.floor(Math.random()*eligible.length)]:employeeObjects[(firstIndex+1)%employeeObjects.length];
+    if(first.userData.state!=="walking")return;
+    const eligible=employeeObjects.filter((candidate,index)=>index!==firstIndex&&candidate.userData.state==="walking"&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
+    const fallback=employeeObjects.find((candidate,index)=>index!==firstIndex&&candidate.userData.state==="walking");
+    const second=eligible.length?eligible[Math.floor(Math.random()*eligible.length)]:fallback;
+    if(!second)return;
     const sitDown=Math.random()<0.68;
     const midpoint=first.position.clone().add(second.position).multiplyScalar(0.5);
     const targets=sitDown?loungeSeats.map(seat=>new THREE.Vector3(seat.x,0.12,seat.z)):[
@@ -755,8 +758,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
       if(!meetingState.active && now>=meetingState.nextAt)startTeamMeeting(now);
       updateTeamMeeting(now);
 
-      if (!socialState.pair && now >= socialState.nextAt) beginConversation(now);
-      if(!socialState.pair && now>=nextWorkActivity)startDeskActivity(now);
+      if (!meetingState.active && !socialState.pair && now >= socialState.nextAt) beginConversation(now);
+      if (!meetingState.active && !socialState.pair && now>=nextWorkActivity)startDeskActivity(now);
       if (socialState.pair) {
         const [a, b] = socialState.pair;
         if (now > socialState.until) {
@@ -783,10 +786,13 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const data = o.userData;
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
-        if (distance < 0.35 && !data.partner) chooseWalkTarget(o);
+        // Preserve reserved destinations while an employee is approaching a desk or meeting seat.
+        if (distance < 0.35 && !data.partner && data.state === "walking") chooseWalkTarget(o);
         if(data.state==="going_to_meeting" && distance<0.48 && data.meetingSeat){
           o.position.set(data.meetingSeat.x,0.5,data.meetingSeat.z);
-          o.rotation.y=data.meetingSeat.yaw;setSeatedPose(o,true);data.state="in_meeting";
+          o.rotation.y=data.meetingSeat.yaw;
+          data.target.set(data.meetingSeat.x,0.5,data.meetingSeat.z);
+          setSeatedPose(o,true);data.state="in_meeting";
         }
         if(data.state==="going_to_desk" && distance<0.35 && data.seat){
           o.position.set(data.seat.x,0.5,data.seat.z);
@@ -797,7 +803,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         if(data.state==="working" && now>data.workUntil){
           setSeatedPose(o,false);data.seat=null;data.state="walking";chooseWalkTarget(o);
         }
-        const moving = distance > 0.18 && data.state!=="chatting" && data.state!=="working";
+        const moving = distance > 0.18 && data.state!=="chatting" && data.state!=="working" && data.state!=="in_meeting";
         if (moving) {
           delta.normalize();
           const step = Math.min(distance, data.speed * 0.016);
