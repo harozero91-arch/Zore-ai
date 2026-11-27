@@ -29,7 +29,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     <div class="zore-office__layout zore-office__layout--single">
       <div class="zore-office__viewport">
         <div class="zore-office__canvas"></div>
-        <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>
+        <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>\n        <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
         <div class="zore-office__views" aria-label="Sudut pandang kantor">
           <button type="button" data-view="front" class="is-active">Depan</button>
           <button type="button" data-view="left">Sektor kiri</button>
@@ -121,22 +121,147 @@ export function mountZoreVirtualOffice(host, options = {}) {
     crystal.position.set(Math.cos(a)*1.2, -0.75, Math.sin(a)*1.2); chandelierGroup.add(crystal);
   }
 
-  // Employees are visual markers linked to real employee records supplied by the host app.
+  // Living employee agents: distinct appearance, autonomous walking and social conversations.
   const employeeObjects = [];
+  const walkBounds = { minX: -17, maxX: 17, minZ: -11, maxZ: 11 };
+  const dialogueLines = [
+    ["Bagaimana perkembangan tugasmu?", "Sudah berjalan. Aku sedang memeriksa detailnya."],
+    ["Aku punya ide untuk proyek ini.", "Menarik. Coba jelaskan, kita kembangkan bersama."],
+    ["Bisa bantu analisis sebentar?", "Tentu, mari kita lihat datanya bersama."],
+    ["Apa prioritas berikutnya?", "Kita selesaikan yang paling penting lebih dulu."],
+    ["Terima kasih atas bantuannya.", "Sama-sama, kerja tim membuat semuanya lebih mudah."]
+  ];
+  const roleTopics = {
+    "Direktur Utama": "arah strategi perusahaan",
+    "Manajer Operasional": "alur kerja tim",
+    "Programmer": "pengembangan sistem",
+    "Analis Data": "temuan data",
+    "Peneliti": "hasil riset",
+    "Desainer Kreatif": "konsep desain",
+    "Pemasaran": "kampanye pemasaran",
+    "Keuangan": "rencana anggaran",
+    "Administrasi": "jadwal dan dokumen"
+  };
+  const collabRoles = {
+    "Direktur Utama": ["Manajer Operasional", "Keuangan", "Analis Data"],
+    "Manajer Operasional": ["Direktur Utama", "Administrasi", "Programmer"],
+    "Programmer": ["Analis Data", "Peneliti", "Manajer Operasional"],
+    "Analis Data": ["Keuangan", "Peneliti", "Direktur Utama"],
+    "Peneliti": ["Analis Data", "Desainer Kreatif", "Programmer"],
+    "Desainer Kreatif": ["Pemasaran", "Peneliti", "Programmer"],
+    "Pemasaran": ["Desainer Kreatif", "Analis Data", "Direktur Utama"],
+    "Keuangan": ["Direktur Utama", "Analis Data", "Manajer Operasional"],
+    "Administrasi": ["Manajer Operasional", "Direktur Utama", "Keuangan"]
+  };
+  const makeBubble = (message) => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 512; canvas.height = 128;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "rgba(255,249,232,0.97)";
+    ctx.strokeStyle = "#c7a56a"; ctx.lineWidth = 7;
+    ctx.beginPath(); ctx.roundRect(8, 8, 496, 108, 25); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#35251b"; ctx.font = "bold 27px Arial";
+    let text = message;
+    while (ctx.measureText(text).width > 450 && text.length > 8) text = text.slice(0, -2) + "…";
+    ctx.fillText(text, 28, 72);
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
+    sprite.scale.set(5.0, 1.25, 1); sprite.position.y = 3.05;
+    sprite.userData.texture = texture;
+    return sprite;
+  };
   employees.slice(0, 9).forEach((employee, i) => {
     const group = new THREE.Group();
     const staffX = (i % 3 - 1) * 10;
     const staffZ = Math.floor(i / 3) * 8 - 7 + 1.8;
     group.position.set(staffX, 0.12, staffZ);
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.72, 4, 8), material(i%2 ? 0x345c50 : 0x70513a));
-    body.position.y = 0.85; body.castShadow = true; group.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 16, 12), material(0xc99570));
-    head.position.y = 1.52; group.add(head);
-    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.1, 10, 8), goldMat);
-    marker.position.y = 2.05; group.add(marker);
-    group.userData.employee = employee;
+    const outfitColor = employee.accent || (i % 2 ? "#345c50" : "#70513a");
+    const bodyMat = material(new THREE.Color(outfitColor), 0.58, 0.04);
+    const skinMat = material(i % 3 === 0 ? 0xd5a17d : i % 3 === 1 ? 0xc99570 : 0xe0b18e);
+    const darkMatLocal = material(0x29201c);
+    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 4, 10), bodyMat);
+    body.position.y = 0.92; body.castShadow = true; group.add(body);
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 16), skinMat);
+    head.position.y = 1.62; head.castShadow = true; group.add(head);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.275, 16, 10, 0, Math.PI*2, 0, Math.PI*0.55), darkMatLocal);
+    hair.position.y = 1.72; group.add(hair);
+    const eyeMat = material(0x241b17);
+    for (const x of [-0.105, 0.105]) {
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), eyeMat);
+      eye.position.set(x, 1.64, 0.245); group.add(eye);
+    }
+    const arms = [];
+    for (const side of [-1, 1]) {
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, 0.43, 3, 8), skinMat);
+      arm.position.set(side * 0.39, 0.95, 0);
+      arm.rotation.z = side * -0.18; group.add(arm); arms.push(arm);
+    }
+    const legs = [];
+    for (const side of [-1, 1]) {
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.36, 3, 8), darkMatLocal);
+      leg.position.set(side * 0.14, 0.35, 0); group.add(leg); legs.push(leg);
+    }
+    const marker = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), goldMat);
+    marker.position.y = 2.12; group.add(marker);
+    const nameCanvas = document.createElement("canvas");
+    nameCanvas.width = 320; nameCanvas.height = 64;
+    const nameCtx = nameCanvas.getContext("2d");
+    nameCtx.fillStyle = "#fff3d8"; nameCtx.font = "bold 34px Arial";
+    nameCtx.textAlign = "center"; nameCtx.fillText(employee.name || "Karyawan", 160, 43);
+    const nameTexture = new THREE.CanvasTexture(nameCanvas);
+    const nameTag = new THREE.Sprite(new THREE.SpriteMaterial({map:nameTexture, transparent:true, depthTest:false}));
+    nameTag.scale.set(2.2, 0.44, 1); nameTag.position.y = 2.48; group.add(nameTag);
+    group.userData = {
+      employee, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
+      speed: 1.25 + (i % 4) * 0.12, phase: i * 0.8, state: "walking",
+      bubble: null, bubbleUntil: 0, partner: null
+    };
     scene.add(group); employeeObjects.push(group);
   });
+
+  const socialState = { nextAt: 5, pair: null, until: 0 };
+  function beginConversation(now) {
+    if (employeeObjects.length < 2) return;
+    const firstIndex = Math.floor(Math.random() * employeeObjects.length);
+    const first = employeeObjects[firstIndex];
+    const eligible = employeeObjects.filter((candidate, index) =>
+      index !== firstIndex &&
+      (collabRoles[first.userData.employee.role] || []).includes(candidate.userData.employee.role)
+    );
+    const second = eligible.length ? eligible[Math.floor(Math.random() * eligible.length)]
+      : employeeObjects[(firstIndex + 1) % employeeObjects.length];
+    const midpoint = first.position.clone().add(second.position).multiplyScalar(0.5);
+    const angle = Math.random() * Math.PI * 2;
+    const meetA = midpoint.clone().add(new THREE.Vector3(Math.cos(angle)*0.85, 0, Math.sin(angle)*0.85));
+    const meetB = midpoint.clone().add(new THREE.Vector3(-Math.cos(angle)*0.85, 0, -Math.sin(angle)*0.85));
+    for (const [person, target] of [[first, meetA], [second, meetB]]) {
+      person.userData.target.set(
+        THREE.MathUtils.clamp(target.x, walkBounds.minX, walkBounds.maxX), 0.12,
+        THREE.MathUtils.clamp(target.z, walkBounds.minZ, walkBounds.maxZ)
+      );
+      person.userData.partner = person === first ? second : first;
+      person.userData.state = "meeting";
+    }
+    const lines = dialogueLines[Math.floor(Math.random() * dialogueLines.length)];
+    const topicA = roleTopics[first.userData.employee.role] || "pekerjaan";
+    const topicB = roleTopics[second.userData.employee.role] || "pekerjaan";
+    first.userData.conversation = lines[0].replace("proyek ini", topicA);
+    second.userData.conversation = lines[1].replace("datanya", topicB);
+    socialState.pair = [first, second]; socialState.until = now + 9000;
+  }
+
+  function showSpeech(person, message, now) {
+    if (person.userData.bubble) {
+      person.remove(person.userData.bubble);
+      person.userData.bubble.material.map?.dispose();
+      person.userData.bubble.material.dispose();
+    }
+    const bubble = makeBubble(message);
+    person.add(bubble);
+    person.userData.bubble = bubble;
+    person.userData.bubbleUntil = now + 3600;
+  }
 
   const raycaster = new THREE.Raycaster();
   const pointer = new THREE.Vector2();
@@ -202,8 +327,53 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const animate = () => {
     if (disposed) return;
     frame = requestAnimationFrame(animate);
+    const now = performance.now();
     if (!reducedMotion) {
-      employeeObjects.forEach((o, i) => { o.position.y = 0.12 + Math.sin(performance.now()*0.001 + i)*0.025; });
+      if (!socialState.pair && now >= socialState.nextAt) beginConversation(now);
+      if (socialState.pair) {
+        const [a, b] = socialState.pair;
+        if (now > socialState.until) {
+          for (const person of [a, b]) {
+            person.userData.partner = null; person.userData.state = "walking";
+            person.userData.target.set(
+              THREE.MathUtils.randFloat(walkBounds.minX, walkBounds.maxX), 0.12,
+              THREE.MathUtils.randFloat(walkBounds.minZ, walkBounds.maxZ)
+            );
+            if (person.userData.bubble) { person.remove(person.userData.bubble); person.userData.bubble = null; }
+          }
+          socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(8500, 14500);
+        } else if (a.position.distanceTo(b.position) < 2.5 && !a.userData.spoke) {
+          showSpeech(a, a.userData.conversation, now);
+          showSpeech(b, b.userData.conversation, now + 900);
+          a.userData.spoke = b.userData.spoke = true;
+        }
+      }
+      employeeObjects.forEach((o, i) => {
+        const data = o.userData;
+        const delta = data.target.clone().sub(o.position); delta.y = 0;
+        const distance = delta.length();
+        if (distance < 0.35 && !data.partner) {
+          data.target.set(THREE.MathUtils.randFloat(walkBounds.minX, walkBounds.maxX), 0.12,
+            THREE.MathUtils.randFloat(walkBounds.minZ, walkBounds.maxZ));
+        }
+        const moving = distance > 0.18;
+        if (moving) {
+          delta.normalize();
+          const step = Math.min(distance, data.speed * 0.016);
+          o.position.addScaledVector(delta, step);
+          o.rotation.y = Math.atan2(delta.x, delta.z);
+        }
+        o.position.y = 0.12 + (moving ? Math.abs(Math.sin(now*0.009 + data.phase))*0.045 : Math.sin(now*0.002 + data.phase)*0.018);
+        data.legs.forEach((leg, index) => { leg.rotation.x = moving ? Math.sin(now*0.012 + data.phase + index*Math.PI)*0.55 : 0; });
+        data.arms.forEach((arm, index) => { arm.rotation.x = moving ? -Math.sin(now*0.012 + data.phase + index*Math.PI)*0.38 : Math.sin(now*0.002 + data.phase)*0.06; });
+        if (data.bubble && now > data.bubbleUntil) {
+          o.remove(data.bubble); data.bubble.material.map?.dispose(); data.bubble.material.dispose(); data.bubble = null;
+        }
+        if (data.partner && data.state === "meeting") {
+          const toward = data.partner.position.clone().sub(o.position);
+          if (toward.lengthSq() > 0.01) o.rotation.y = Math.atan2(toward.x, toward.z);
+        }
+      });
     }
     renderer.render(scene, camera);
   };
