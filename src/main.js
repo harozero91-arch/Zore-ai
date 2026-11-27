@@ -41,7 +41,7 @@ function taskCard(task){
   const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
   const results=resultRows.filter(r=>r.task_id===task.id).sort((a,b)=>b.version-a.version);
   const report=officeData.reports.find(r=>r.task_id===task.id&&r.kind==="final");
-  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${results.length?'<details class="result-details"><summary>Lihat hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${report?'<p class="manager-report"><strong>Laporan:</strong> '+esc(report.body)+'</p>':""}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}</article>`;
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${results.length?'<details class="result-details"><summary>Lihat hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${report?'<div class="manager-report-wrap"><p class="manager-report"><strong>Laporan:</strong> '+esc(report.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(report.body)+'">Salin laporan</button></div>':""}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}</article>`;
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
@@ -53,7 +53,7 @@ function renderWorkspace(){
   document.querySelector("#profile-panel").addEventListener("click",()=>{});
   document.querySelector("#task-form").addEventListener("submit",assignTask);
   document.querySelector("#refresh-work").addEventListener("click",()=>syncOffice(true));
-  document.querySelector(".work-list").addEventListener("click",handleReview);
+  document.querySelector(".work-list").addEventListener("click",handleWorkListClick);
 }
 function selectEmployee(id){selectedEmployee=EMPLOYEE_PROFILES.find(e=>e.id===id)||EMPLOYEE_PROFILES[0];const panel=document.querySelector("#profile-panel");if(panel)panel.innerHTML=renderProfile(selectedEmployee);}
 async function syncOffice(redraw=false){
@@ -71,7 +71,7 @@ async function syncOffice(redraw=false){
       const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
       const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
       updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
-      updated.querySelector(".work-list")?.addEventListener("click",handleReview);
+      updated.querySelector(".work-list")?.addEventListener("click",handleWorkListClick);
     }
     const feed=document.querySelector(".activity-feed");
     if(feed) feed.innerHTML='<h2>Aktivitas dan laporan tim</h2>'+(officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>');
@@ -90,6 +90,31 @@ async function assignTask(event){
   msg.textContent="Pekerjaan masuk antrean server. Worker AI akan mengambilnya otomatis.";
   event.currentTarget.reset();
   await syncOffice(true);showNotice("Tugas berhasil masuk antrean. Pantau tahap kerja dan hasil AI di bawah.","success");
+}
+async function handleWorkListClick(event){
+  const copyButton=event.target.closest("[data-copy-text]");
+  if(copyButton){
+    const text=decodeURIComponent(copyButton.dataset.copyText||"");
+    try{
+      if(navigator.clipboard?.writeText){
+        await navigator.clipboard.writeText(text);
+      }else{
+        const area=document.createElement("textarea");
+        area.value=text;area.style.position="fixed";area.style.opacity="0";
+        document.body.appendChild(area);area.select();
+        const copied=document.execCommand("copy");area.remove();
+        if(!copied)throw new Error("Clipboard tidak tersedia");
+      }
+      const original=copyButton.textContent;
+      copyButton.textContent="Tersalin!";
+      copyButton.disabled=true;
+      setTimeout(()=>{copyButton.textContent=original;copyButton.disabled=false;},1400);
+    }catch(error){
+      showNotice("Tidak dapat menyalin otomatis. Tekan lama teks laporan untuk menyalinnya.","error");
+    }
+    return;
+  }
+  await handleReview(event);
 }
 async function handleReview(event){
   const approve=event.target.closest("[data-approve]"),revise=event.target.closest("[data-revise]");if(!approve&&!revise)return;
