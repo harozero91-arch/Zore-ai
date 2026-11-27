@@ -24,6 +24,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         <button type="button" data-action="day">☀ Siang</button>
         <button type="button" data-action="night">☾ Malam</button>
         <button type="button" data-action="sound" aria-pressed="false">♫ Suara: Off</button>
+        <button type="button" data-action="meeting">▣ Mulai rapat</button>
       </div>
     </div>
     <div class="zore-office__layout zore-office__layout--single">
@@ -519,6 +520,65 @@ export function mountZoreVirtualOffice(host, options = {}) {
     sendEmployeeToDesk(person,now);
     nextWorkActivity=now+THREE.MathUtils.randFloat(9000,15000);
   }
+  const meetingState = { active:false, participants:[], agenda:[], index:0, nextAt:45000, nextLineAt:0, endsAt:0 };
+  const meetingButton=host.querySelector('[data-action="meeting"]');
+  function startTeamMeeting(now){
+    if(meetingState.active || employeeObjects.length<2)return;
+    const available=employeeObjects.filter(p=>!p.userData.partner && (p.userData.state==="walking" || p.userData.state==="working"));
+    if(available.length<2)return;
+    const chosen=available.slice().sort(()=>Math.random()-0.5).slice(0,Math.min(8,available.length));
+    const lead=chosen.find(p=>p.userData.employee.role==="AI Creative Manager")||chosen[0];
+    const others=chosen.filter(p=>p!==lead);
+    meetingState.participants=chosen;
+    meetingState.agenda=[
+      [lead,"Rapat dimulai. Kita tinjau progres, kendala, dan prioritas berikutnya."],
+      ...others.map((p)=>[p,({
+        "CEO":"Saya akan meninjau rekomendasi. Keputusan akhir tetap berada pada CEO.",
+        "AI Scriptwriter":"Naskah dan dialog sudah saya evaluasi. Saya siapkan revisi yang lebih kuat.",
+        "AI Storyboard Artist":"Storyboard sudah saya cek. Saya usulkan alur visual yang lebih jelas.",
+        "AI Character Designer":"Desain karakter saya rapikan agar konsisten di setiap adegan.",
+        "AI Background Artist":"Latar dan pencahayaan saya sesuaikan dengan suasana cerita.",
+        "AI 2D Animator":"Timing animasi perlu diperhalus agar gerakan terasa natural.",
+        "AI Cleanup & Color Artist":"Saya pastikan garis dan warna konsisten sebelum hasil akhir.",
+        "AI Graphic Designer & Video Editor":"Materi grafis dan hasil editing akan saya periksa untuk kualitas akhir."
+      })[p.userData.employee.role]||"Saya akan menyampaikan perkembangan dan rekomendasi pekerjaan saya.")])
+    ];
+    meetingState.index=0;meetingState.active=true;meetingState.nextLineAt=now+900;
+    meetingState.endsAt=now+Math.max(18000,meetingState.agenda.length*4200+2500);
+    meetingState.nextAt=now+90000;
+    if(socialState.pair){
+      for(const p of socialState.pair){p.userData.partner=null;p.userData.state="walking";setSeatedPose(p,false);p.userData.seat=null;if(p.userData.bubble){p.remove(p.userData.bubble);p.userData.bubble=null;}chooseWalkTarget(p);}
+      socialState.pair=null;socialState.nextAt=now+18000;
+    }
+    chosen.forEach((p,i)=>{
+      const angle=(i/chosen.length)*Math.PI*2-Math.PI/2;
+      const seat={x:Math.cos(angle)*3.45,z:1+Math.sin(angle)*3.45,yaw:-angle+Math.PI/2};
+      const approach={x:Math.cos(angle)*4.65,z:1+Math.sin(angle)*4.65};
+      setSeatedPose(p,false);p.userData.partner=null;p.userData.seat=seat;
+      p.userData.state="going_to_meeting";p.userData.target.set(approach.x,0.12,approach.z);
+      p.userData.meetingSeat=seat;p.userData.spoke=false;
+    });
+    label.textContent="Ruang Rapat · Presentasi & Evaluasi Tim";
+    meetingButton.textContent="● Rapat berlangsung";
+  }
+  meetingButton.addEventListener("click",()=>startTeamMeeting(performance.now()));
+  function updateTeamMeeting(now){
+    if(!meetingState.active)return;
+    const allArrived=meetingState.participants.every(p=>p.userData.state==="in_meeting");
+    if(allArrived && now>=meetingState.nextLineAt && meetingState.index<meetingState.agenda.length){
+      const [speaker,line]=meetingState.agenda[meetingState.index];
+      showSpeech(speaker,line,now);meetingState.index++;meetingState.nextLineAt=now+3900;
+    }
+    if(now>=meetingState.endsAt || (meetingState.index>=meetingState.agenda.length && now>=meetingState.nextLineAt+1500)){
+      meetingState.participants.forEach(p=>{
+        setSeatedPose(p,false);p.userData.seat=null;p.userData.meetingSeat=null;p.userData.state="walking";
+        if(p.userData.bubble){p.remove(p.userData.bubble);p.userData.bubble=null;}
+        chooseWalkTarget(p);
+      });
+      meetingState.active=false;meetingState.participants=[];meetingState.nextAt=now+90000;
+      meetingButton.textContent="▣ Mulai rapat";label.textContent="Kantor Terpadu · Semua Divisi";
+    }
+  }
   const socialState = { nextAt: 5, pair: null, until: 0 };
   function beginConversation(now) {
     if(employeeObjects.length<2)return;
@@ -692,6 +752,9 @@ export function mountZoreVirtualOffice(host, options = {}) {
     frame = requestAnimationFrame(animate);
     const now = performance.now();
     if (!reducedMotion) {
+      if(!meetingState.active && now>=meetingState.nextAt)startTeamMeeting(now);
+      updateTeamMeeting(now);
+
       if (!socialState.pair && now >= socialState.nextAt) beginConversation(now);
       if(!socialState.pair && now>=nextWorkActivity)startDeskActivity(now);
       if (socialState.pair) {
@@ -721,6 +784,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
         if (distance < 0.35 && !data.partner) chooseWalkTarget(o);
+        if(data.state==="going_to_meeting" && distance<0.48 && data.meetingSeat){
+          o.position.set(data.meetingSeat.x,0.5,data.meetingSeat.z);
+          o.rotation.y=data.meetingSeat.yaw;setSeatedPose(o,true);data.state="in_meeting";
+        }
         if(data.state==="going_to_desk" && distance<0.35 && data.seat){
           o.position.set(data.seat.x,0.5,data.seat.z);
           o.rotation.y=data.seat.yaw;
