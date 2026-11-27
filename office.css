@@ -80,3 +80,45 @@
     width: min(280px, calc(100% - 24px));
   }
 }
+
+
+/* Fixed sector viewpoints: limited angles, never free 360-degree rotation. */
+.zore-office__views {
+  position: absolute;
+  z-index: 3;
+  top: 62px;
+  left: 16px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: min(390px, calc(100% - 32px));
+}
+.zore-office__views button {
+  padding: 8px 11px;
+  border: 1px solid #b99a67;
+  border-radius: 999px;
+  color: #fff1d6;
+  background: #34251ddd;
+  font-size: 11px;
+}
+.zore-office__views button.is-active {
+  color: #2c2117;
+  background: #d4b477;
+  border-color: #f0d49a;
+  font-weight: 700;
+}
+@media(max-width:700px) {
+  .zore-office__views {
+    top: 112px;
+    left: 12px;
+    gap: 5px;
+    max-width: calc(100% - 24px);
+  }
+  .zore-office__views button {
+    padding: 7px 9px;
+    font-size: 10px;
+  }
+  .zore-office__layout--single .zore-office__light {
+    top: 62px;
+  }
+}
