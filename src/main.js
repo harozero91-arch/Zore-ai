@@ -5,6 +5,7 @@ import { supabase } from "./supabase.js";
 import { EMPLOYEE_PROFILES, ORG_DEPARTMENTS, getCharacterState, getCollaborators } from "./employee-character-system.js";
 
 const app=document.querySelector("#app");
+const OWNER_EMAIL="rendareza83@gmail.com";
 
 let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -23,7 +24,7 @@ function renderAuth(message=""){
     button.disabled=true;button.textContent="Menghubungkan ke Google…";message.textContent="";
     const {error}=await supabase.auth.signInWithOAuth({
       provider:"google",
-      options:{redirectTo:window.location.origin}
+      options:{redirectTo:window.location.origin,queryParams:{login_hint:OWNER_EMAIL,prompt:"select_account"}}
     });
     if(error){message.textContent="Login Google gagal: "+error.message;button.disabled=false;button.textContent="Masuk dengan Google";}
   });
@@ -99,6 +100,7 @@ async function handleReview(event){
   await syncOffice(true);showNotice(ok?"Hasil disetujui.":"Revisi dikirim kembali ke antrean.","success");
 }
 async function enterWorkspace(user){
+  if((user.email||"").toLowerCase()!==OWNER_EMAIL){await supabase.auth.signOut();renderAuth("Akun "+(user.email||"ini")+" bukan akun CEO yang terdaftar. Gunakan "+OWNER_EMAIL+".");return;}
   currentUser=user;
   const {error}=await supabase.rpc("office_sync");
   if(error){renderAuth("Akun masuk, tetapi ruang kerja belum dapat dibuka: "+error.message);return;}
