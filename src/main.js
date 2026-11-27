@@ -112,6 +112,6 @@ async function boot(){
   if(!supabase){renderAuth("Konfigurasi koneksi belum tersedia. Periksa pengaturan proyek.");return;}
   const {data:{session}}=await supabase.auth.getSession();
   if(session?.user)await enterWorkspace(session.user);else renderAuth();
-  supabase.auth.onAuthStateChange((_event,session)=>{if(session?.user){if(!currentUser||currentUser.id!==session.user.id)enterWorkspace(session.user);}else{currentUser=null;if(syncTimer)clearInterval(syncTimer);renderAuth();}});
+  supabase.auth.onAuthStateChange((_event,session)=>{if(session?.user){if(!currentUser||currentUser.id!==session.user.id)setTimeout(()=>enterWorkspace(session.user),0);}else{currentUser=null;if(syncTimer)clearInterval(syncTimer);renderAuth();}});
 }
 boot();
