@@ -104,10 +104,30 @@ async function handleWorkListClick(event){
     const title=task.title||"tugas ini";
     if(!confirm(`Hapus tugas "${title}" dari daftar? Tindakan ini tidak dapat dibatalkan.`))return;
     deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
-    const {error}=await supabase.from("office_tasks").delete().eq("id",taskId);
-    if(error){deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";showNotice("Tugas belum terhapus: "+error.message,"error");return;}
-    await syncOffice(true);
-    showNotice("Tugas berhasil dihapus dari daftar.","success");
+    let deletion;
+    try{
+      deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);
+    }catch(err){
+      deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
+      showNotice("Tugas belum terhapus: "+(err?.message||"Koneksi database gagal."),"error");return;
+    }
+    const {error,count}=deletion||{};
+    if(error||count===0||count==null){
+      deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
+      showNotice("Tugas belum dapat dipastikan terhapus: "+(error?.message||"Database tidak mengonfirmasi penghapusan. Periksa izin CEO dan kebijakan Supabase."),"error");return;
+    }
+    // Hanya ubah tampilan setelah database mengonfirmasi penghapusan.
+    officeData.tasks=officeData.tasks.filter(item=>String(item.id)!==String(taskId));
+    officeData.reports=officeData.reports.filter(item=>String(item.task_id)!==String(taskId));
+    resultRows=resultRows.filter(item=>String(item.task_id)!==String(taskId));
+    const monitor=document.querySelector(".work-monitor");
+    if(monitor){
+      const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
+      const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
+      updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
+      updated.querySelector(".work-list")?.addEventListener("click",handleWorkListClick);
+    }
+    showNotice("Tugas berhasil dihapus dan langsung dihilangkan dari layar.","success");
     return;
   }
   const copyButton=event.target.closest("[data-copy-text]");
