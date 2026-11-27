@@ -158,10 +158,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
     scene.background.set(0x171d28); scene.fog.color.set(0x171d28);
     sun.intensity = 0.28; chandelier.intensity = 65;
   });
+  // Elevated fixed viewpoints stay inside the open-plan footprint so side walls
+  // do not block the view into the roofless office.
   const viewPositions = {
-    front: new THREE.Vector3(0, 27, 43),
-    left: new THREE.Vector3(-43, 24, 18),
-    right: new THREE.Vector3(43, 24, 18)
+    front: new THREE.Vector3(0, 27, 36),
+    left: new THREE.Vector3(-16, 29, 9),
+    right: new THREE.Vector3(16, 29, 9)
   };
   host.querySelectorAll("[data-view]").forEach(button => {
     button.addEventListener("click", () => {
