@@ -180,3 +180,38 @@
     bottom: 40px;
   }
 }
+
+
+/* Bounded touch-orbit guidance; camera movement is limited to a small arc. */
+.zore-office__touch-hint {
+  position: absolute;
+  left: 50%;
+  bottom: 14px;
+  transform: translateX(-50%);
+  z-index: 4;
+  max-width: calc(100% - 24px);
+  padding: 8px 13px;
+  border: 1px solid rgba(205,174,119,.55);
+  border-radius: 999px;
+  background: rgba(24,37,43,.82);
+  color: #f4ead8;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+}
+.zore-office__canvas canvas {
+  touch-action: none;
+  cursor: grab;
+}
+.zore-office__canvas canvas:active {
+  cursor: grabbing;
+}
+@media(max-width:520px) {
+  .zore-office__touch-hint {
+    bottom: 10px;
+    font-size: 10px;
+    white-space: normal;
+  }
+}
