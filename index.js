@@ -541,7 +541,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         "AI 2D Animator":"Timing animasi perlu diperhalus agar gerakan terasa natural.",
         "AI Cleanup & Color Artist":"Saya pastikan garis dan warna konsisten sebelum hasil akhir.",
         "AI Graphic Designer & Video Editor":"Materi grafis dan hasil editing akan saya periksa untuk kualitas akhir."
-      })[p.userData.employee.role]||"Saya akan menyampaikan perkembangan dan rekomendasi pekerjaan saya.")])
+      })[p.userData.employee.role]||"Saya akan menyampaikan perkembangan dan rekomendasi pekerjaan saya."])
     ];
     meetingState.index=0;meetingState.active=true;meetingState.nextLineAt=now+900;
     meetingState.endsAt=now+Math.max(18000,meetingState.agenda.length*4200+2500);
