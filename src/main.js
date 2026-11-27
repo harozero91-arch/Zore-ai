@@ -99,9 +99,9 @@ async function handleWorkListClick(event){
   const deleteButton=event.target.closest("[data-delete-task]");
   if(deleteButton){
     const taskId=deleteButton.dataset.deleteTask;
-    const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
-    if(!task){showNotice("Tugas tidak ditemukan pada daftar terbaru. Tekan Perbarui lalu coba lagi.","error");return;}
-    const title=task.title||"tugas ini";
+    const taskCardElement=deleteButton.closest(".work-card");
+    const title=taskCardElement?.querySelector("h3")?.textContent?.trim()||"tugas ini";
+    if(!taskId){showNotice("ID tugas tidak terbaca. Muat ulang halaman lalu coba lagi.","error");return;}
     if(!confirm(`Hapus tugas "${title}" dari daftar? Tindakan ini tidak dapat dibatalkan.`))return;
     deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
     let deletion;
