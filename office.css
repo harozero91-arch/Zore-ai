@@ -1,0 +1,26 @@
+.zore-office{--mahogany:#4b2c20;--gold:#c7a56a;--ivory:#f4efdf;--ink:#2c241e;color:#2c241e;background:#f5f0e6;border:1px solid #d7c7aa;border-radius:18px;overflow:hidden;font-family:Inter,system-ui,sans-serif;min-height:620px}
+.zore-office *{box-sizing:border-box}
+.zore-office__top{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:18px 20px;background:linear-gradient(110deg,#38241b,#62432d);color:#fff8e9}
+.zore-office__top strong{font-family:Georgia,serif;font-size:20px;font-weight:600}
+.zore-office__eyebrow,.zore-office__nav-title{font-size:10px;letter-spacing:.17em;color:#d9bd87;margin-bottom:5px}
+.zore-office__actions{display:flex;gap:7px;flex-wrap:wrap}
+.zore-office button{font:inherit;cursor:pointer}
+.zore-office__actions button{border:1px solid #b99a67;background:#ffffff12;color:#fff5df;border-radius:999px;padding:8px 12px;font-size:12px}
+.zore-office__actions button:disabled{opacity:.5;cursor:not-allowed}
+.zore-office__layout{display:grid;grid-template-columns:220px minmax(0,1fr);min-height:520px}
+.zore-office__nav{padding:17px 13px;background:#eee5d5;border-right:1px solid #d8c8ad}
+.zore-office__nav-title{color:#82633d;font-weight:700}
+.zore-office__room-list{display:grid;gap:5px;margin:12px 0 22px}
+.zore-office__room{border:0;text-align:left;background:transparent;color:#4c3a2c;padding:10px 11px;border-radius:9px;font-size:13px}
+.zore-office__room:hover,.zore-office__room.is-active{background:#dfd0b6;color:#38251a}
+.zore-office__room.is-active{box-shadow:inset 3px 0 #b48b4e;font-weight:700}
+.zore-office__light{display:grid;gap:9px;font-size:12px;color:#69533d}
+.zore-office__light input{width:100%;accent-color:#987344}
+.zore-office__hint{font-size:11px;line-height:1.55;color:#88745d}
+.zore-office__viewport{position:relative;min-width:0;min-height:520px;background:#d8d0c1}
+.zore-office__canvas,.zore-office__canvas canvas{width:100%;height:100%;display:block;min-height:520px}
+.zore-office__room-label{position:absolute;left:16px;top:15px;padding:8px 12px;background:#34251dcc;color:#fff1d6;border:1px solid #c5a36b;border-radius:8px;font:14px Georgia,serif;pointer-events:none}
+.zore-office__help{position:absolute;right:14px;bottom:12px;padding:7px 10px;border-radius:7px;background:#fffdf0c9;color:#574633;font-size:11px;pointer-events:none}
+.zore-office__footer{display:flex;justify-content:space-between;gap:10px;padding:11px 16px;background:#e8dece;color:#79654c;font-size:9px;letter-spacing:.09em}
+@media(max-width:700px){.zore-office{border-radius:12px;min-height:0}.zore-office__top{align-items:flex-start;flex-direction:column;padding:14px}.zore-office__layout{grid-template-columns:1fr}.zore-office__nav{border-right:0;border-bottom:1px solid #d8c8ad;padding:10px}.zore-office__room-list{display:flex;overflow-x:auto;gap:5px;margin:8px 0 12px;padding-bottom:4px}.zore-office__room{white-space:nowrap;border:1px solid #d6c4a6}.zore-office__light{grid-template-columns:120px 1fr;align-items:center}.zore-office__hint{display:none}.zore-office__viewport,.zore-office__canvas,.zore-office__canvas canvas{min-height:420px}.zore-office__footer{font-size:8px;flex-direction:column}}
+@media(prefers-reduced-motion:reduce){.zore-office *{scroll-behavior:auto!important}}
