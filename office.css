@@ -24,3 +24,59 @@
 .zore-office__footer{display:flex;justify-content:space-between;gap:10px;padding:11px 16px;background:#e8dece;color:#79654c;font-size:9px;letter-spacing:.09em}
 @media(max-width:700px){.zore-office{border-radius:12px;min-height:0}.zore-office__top{align-items:flex-start;flex-direction:column;padding:14px}.zore-office__layout{grid-template-columns:1fr}.zore-office__nav{border-right:0;border-bottom:1px solid #d8c8ad;padding:10px}.zore-office__room-list{display:flex;overflow-x:auto;gap:5px;margin:8px 0 12px;padding-bottom:4px}.zore-office__room{white-space:nowrap;border:1px solid #d6c4a6}.zore-office__light{grid-template-columns:120px 1fr;align-items:center}.zore-office__hint{display:none}.zore-office__viewport,.zore-office__canvas,.zore-office__canvas canvas{min-height:420px}.zore-office__footer{font-size:8px;flex-direction:column}}
 @media(prefers-reduced-motion:reduce){.zore-office *{scroll-behavior:auto!important}}
+
+
+/* Single unified open-plan office: no room navigation or camera-rotation controls. */
+.zore-office__layout--single {
+  display: block;
+  min-height: 560px;
+}
+.zore-office__layout--single .zore-office__viewport {
+  min-height: 560px;
+}
+.zore-office__layout--single .zore-office__canvas,
+.zore-office__layout--single .zore-office__canvas canvas {
+  min-height: 560px;
+  height: 560px;
+}
+.zore-office__layout--single .zore-office__light {
+  position: absolute;
+  z-index: 2;
+  top: 15px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: min(280px, 48%);
+  padding: 9px 12px;
+  border: 1px solid #c5a36b;
+  border-radius: 8px;
+  color: #fff1d6;
+  background: #34251dcc;
+  font-size: 11px;
+}
+.zore-office__layout--single .zore-office__light input {
+  min-width: 70px;
+  width: 100%;
+  accent-color: #d4b477;
+}
+.zore-office__layout--single .zore-office__help {
+  content: none;
+}
+@media(max-width:700px) {
+  .zore-office__layout--single,
+  .zore-office__layout--single .zore-office__viewport {
+    min-height: 430px;
+  }
+  .zore-office__layout--single .zore-office__canvas,
+  .zore-office__layout--single .zore-office__canvas canvas {
+    min-height: 430px;
+    height: 430px;
+  }
+  .zore-office__layout--single .zore-office__light {
+    top: 62px;
+    left: 12px;
+    right: auto;
+    width: min(280px, calc(100% - 24px));
+  }
+}
