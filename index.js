@@ -296,6 +296,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
       [10.7,-11.2,-1],[16.5,-11.2,-1],[10.7,-2.1,-1],[16.5,-2.1,-1],
       [-5.4,-11.2,1],[0,-11.2,1],[5.4,-11.2,1]]
       .map(([x,z,side])=>({circleX:x,circleZ:z+side*1.35,radius:0.72})),
+    // Dedicated lounge chairs.
+    ...[{x:9.05,z:10.45},{x:15.05,z:10.45}].map(p=>({circleX:p.x,circleZ:p.z,radius:0.82})),
     // Meeting table and individual meeting chairs
     { circleX: 0, circleZ: 1, radius: 2.95 },
     ...Array.from({length:8},(_,i)=>({circleX:Math.cos(i*Math.PI/4)*3.45,circleZ:1+Math.sin(i*Math.PI/4)*3.45,radius:0.72})),
@@ -307,6 +309,25 @@ export function mountZoreVirtualOffice(host, options = {}) {
     ...[[-19,-13,1.2],[-19,7,1.0],[-7,-14,0.9],[7,-14,0.9],[19,-12,1.1],[19,5,1.0],[-19,13,1.1],[19,14,1.0],[4,7,0.8]]
       .map(([x,z,r])=>({circleX:x,circleZ:z,radius:0.48*r+0.42}))
   ];
+  // Lounge seating for employee-to-employee conversations.
+  const loungeSeats = [
+    {x:9.05,z:10.45,yaw:Math.PI/2},
+    {x:15.05,z:10.45,yaw:-Math.PI/2}
+  ];
+  loungeSeats.forEach((seat,index)=>{
+    const chair=new THREE.Group();
+    const wood=material(0x68452f,0.72,0.02);
+    const cushion=material(index===0?0x49645b:0x806044,0.82,0.01);
+    const seatBase=new THREE.Mesh(new THREE.BoxGeometry(1.15,0.18,0.95),cushion);
+    seatBase.position.y=0.55;seatBase.castShadow=true;seatBase.receiveShadow=true;chair.add(seatBase);
+    const back=new THREE.Mesh(new THREE.BoxGeometry(1.15,1.05,0.16),cushion);
+    back.position.set(0,1.08,-0.39);back.castShadow=true;chair.add(back);
+    for(const x of [-0.47,0.47])for(const z of [-0.36,0.36]){
+      const leg=new THREE.Mesh(new THREE.BoxGeometry(0.1,0.52,0.1),wood);
+      leg.position.set(x,0.26,z);chair.add(leg);
+    }
+    chair.position.set(seat.x,0,seat.z);chair.rotation.y=seat.yaw;scene.add(chair);
+  });
   const STAFF_RADIUS = 0.48;
   function hitsSolidArea(x,z) {
     return solidAreas.some(area => {
@@ -422,43 +443,89 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const nameTag = new THREE.Sprite(new THREE.SpriteMaterial({map:nameTexture, transparent:true, depthTest:false}));
     nameTag.scale.set(2.2, 0.44, 1); nameTag.position.y = 2.48; group.add(nameTag);
     group.userData = {
-      employee, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
+      employee, body, head, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
       speed: 1.25 + (i % 4) * 0.12, phase: i * 0.8, state: "walking",
-      bubble: null, bubbleUntil: 0, partner: null
+      bubble: null, bubbleUntil: 0, partner: null, seated: false, seat: null
     };
     scene.add(group); employeeObjects.push(group);
   });
 
+  function setSeatedPose(person,seated){
+    const d=person.userData;
+    if(d.seated===seated)return;
+    d.seated=seated;
+    if(seated){
+      d.body.position.y=0.78;d.head.position.y=1.39;
+      d.arms.forEach((arm,index)=>{
+        arm.position.y=0.73;arm.position.z=0.12;
+        arm.rotation.x=-0.38;arm.rotation.z=index===0?-0.12:0.12;
+      });
+      d.legs.forEach((leg,index)=>{
+        leg.position.set(index===0?-0.14:0.14,0.29,0.27);
+        leg.rotation.x=Math.PI/2;
+      });
+    }else{
+      d.body.position.y=0.92;d.head.position.y=1.62;
+      d.arms.forEach((arm,index)=>{
+        arm.position.set(index===0?-0.39:0.39,0.95,0);
+        arm.rotation.set(0,0,index===0?0.18:-0.18);
+      });
+      d.legs.forEach((leg,index)=>{
+        leg.position.set(index===0?-0.14:0.14,0.35,0);
+        leg.rotation.set(0,0,0);
+      });
+      person.position.y=0.12;
+    }
+  }
+  const personalityDialogue={
+    "AI Creative Manager":[
+      ["Kita cek target dan tenggat dulu. Bagian mana yang masih tertinggal?","Aku sudah menyiapkan dua opsi. Kita pilih yang paling realistis."],
+      ["Tolong pastikan hasil akhirnya sesuai brief.","Siap. Aku rapikan detailnya sebelum dikirim."]
+    ],
+    "AI Scriptwriter":[
+      ["Aku membayangkan pembuka yang lebih emosional agar penonton langsung terhubung.","Menarik. Beri ruang agar visual ikut bercerita."],
+      ["Konflik kecil bisa membuat tokohnya terasa lebih hidup.","Setuju. Aku catat lalu kembangkan dialognya."]
+    ],
+    "AI Storyboard Artist":[["Adegan ini lebih kuat dengan close-up lalu wide shot.","Aku sesuaikan komposisi panel agar transisinya jelas."]],
+    "AI Character Designer":[["Ekspresi tokohnya perlu lebih mudah dibaca.","Aku punya beberapa alternatif bentuk dan kostum."]],
+    "AI Background Artist":[["Cahaya sore bisa membuat suasana lebih hangat.","Aku jaga perspektif dan palet warnanya tetap konsisten."]],
+    "AI 2D Animator":[["Gerakannya terasa kaku. Aku ingin coba timing lebih lentur.","Coba tambah anticipation sedikit, lalu kita bandingkan."]],
+    "AI Cleanup & Color Artist":[["Garis tepinya belum seragam. Aku cek frame satu per satu.","Setelah itu aku samakan warna dan ketebalannya."]],
+    "AI Graphic Designer & Video Editor":[["Aku bisa buat versi ringkas untuk layar ponsel.","Pastikan teks tetap terbaca dan ritme editnya nyaman."]],
+    "CEO":[["Bagaimana perkembangan proyek? Keputusan penting tetap menunggu persetujuanku.","Tim siap. Kami menyiapkan analisis dan rekomendasi untuk Anda."]
+    ]
+  };
+  function conversationFor(first,second){
+    const role=first.userData.employee.role;
+    const choices=personalityDialogue[role]||[["Aku sedang mengerjakan "+(roleTopics[role]||"tugas tim")+". Ada masukan?","Aku akan bantu cek dari sisi "+(roleTopics[second.userData.employee.role]||"pekerjaan")+"."]];
+    return choices[Math.floor(Math.random()*choices.length)];
+  }
   const socialState = { nextAt: 5, pair: null, until: 0 };
   function beginConversation(now) {
-    if (employeeObjects.length < 2) return;
-    const firstIndex = Math.floor(Math.random() * employeeObjects.length);
-    const first = employeeObjects[firstIndex];
-    const eligible = employeeObjects.filter((candidate, index) =>
-      index !== firstIndex &&
-      (collabRoles[first.userData.employee.role] || []).includes(candidate.userData.employee.role)
-    );
-    const second = eligible.length ? eligible[Math.floor(Math.random() * eligible.length)]
-      : employeeObjects[(firstIndex + 1) % employeeObjects.length];
-    const midpoint = first.position.clone().add(second.position).multiplyScalar(0.5);
-    const angle = Math.random() * Math.PI * 2;
-    const meetA = midpoint.clone().add(new THREE.Vector3(Math.cos(angle)*0.85, 0, Math.sin(angle)*0.85));
-    const meetB = midpoint.clone().add(new THREE.Vector3(-Math.cos(angle)*0.85, 0, -Math.sin(angle)*0.85));
-    for (const [person, target] of [[first, meetA], [second, meetB]]) {
-      person.userData.target.set(
-        THREE.MathUtils.clamp(target.x, walkBounds.minX, walkBounds.maxX), 0.12,
-        THREE.MathUtils.clamp(target.z, walkBounds.minZ, walkBounds.maxZ)
-      );
-      person.userData.partner = person === first ? second : first;
-      person.userData.state = "meeting";
-      person.userData.spoke = false;
+    if(employeeObjects.length<2)return;
+    const firstIndex=Math.floor(Math.random()*employeeObjects.length);
+    const first=employeeObjects[firstIndex];
+    const eligible=employeeObjects.filter((candidate,index)=>index!==firstIndex&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
+    const second=eligible.length?eligible[Math.floor(Math.random()*eligible.length)]:employeeObjects[(firstIndex+1)%employeeObjects.length];
+    const sitDown=Math.random()<0.68;
+    const midpoint=first.position.clone().add(second.position).multiplyScalar(0.5);
+    const targets=sitDown?loungeSeats.map(seat=>new THREE.Vector3(seat.x,0.12,seat.z)):[
+      midpoint.clone().add(new THREE.Vector3(-0.9,0,0)),
+      midpoint.clone().add(new THREE.Vector3(0.9,0,0))
+    ];
+    for(const [index,person] of [first,second].entries()){
+      setSeatedPose(person,false);
+      person.userData.target.copy(targets[index]);
+      person.userData.partner=index===0?second:first;
+      person.userData.state=sitDown?"approaching_seat":"meeting";
+      person.userData.seat=sitDown?loungeSeats[index]:null;
+      person.userData.spoke=false;
     }
-    const lines = dialogueLines[Math.floor(Math.random() * dialogueLines.length)];
-    const topicA = roleTopics[first.userData.employee.role] || "pekerjaan";
-    const topicB = roleTopics[second.userData.employee.role] || "pekerjaan";
-    first.userData.conversation = lines[0].replace("proyek ini", topicA);
-    second.userData.conversation = lines[1].replace("datanya", topicB);
-    socialState.pair = [first, second]; socialState.until = now + 18000;
+    const lines=conversationFor(first,second);
+    first.userData.conversation=lines[0];
+    second.userData.conversation=lines[1];
+    socialState.mode=sitDown?"seated":"standing";
+    socialState.pair=[first,second];socialState.until=now+(sitDown?26000:16000);
   }
 
   function showSpeech(person, message, now) {
@@ -611,15 +678,22 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const [a, b] = socialState.pair;
         if (now > socialState.until) {
           for (const person of [a, b]) {
-            person.userData.partner = null; person.userData.state = "walking";
+            person.userData.partner=null;person.userData.state="walking";
+            setSeatedPose(person,false);person.userData.seat=null;
             chooseWalkTarget(person);
             if (person.userData.bubble) { person.remove(person.userData.bubble); person.userData.bubble = null; }
           }
           socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(8500, 14500);
-        } else if (a.position.distanceTo(b.position) < 2.5 && !a.userData.spoke) {
-          showSpeech(a, a.userData.conversation, now);
-          showSpeech(b, b.userData.conversation, now + 900);
-          a.userData.spoke = b.userData.spoke = true;
+        } else if(!a.userData.spoke && (socialState.mode!=="seated" || (a.position.distanceTo(a.userData.target)<0.45 && b.position.distanceTo(b.userData.target)<0.45))){
+          if(socialState.mode==="seated"){
+            for(const person of [a,b]){
+              const seat=person.userData.seat;
+              if(seat){person.position.set(seat.x,0.5,seat.z);person.rotation.y=seat.yaw;setSeatedPose(person,true);person.userData.state="chatting";}
+            }
+          }
+          showSpeech(a,a.userData.conversation,now);
+          showSpeech(b,b.userData.conversation,now+1600);
+          a.userData.spoke=b.userData.spoke=true;
         }
       }
       employeeObjects.forEach((o, i) => {
@@ -627,7 +701,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
         if (distance < 0.35 && !data.partner) chooseWalkTarget(o);
-        const moving = distance > 0.18;
+        const moving = distance > 0.18 && data.state!=="chatting";
         if (moving) {
           delta.normalize();
           const step = Math.min(distance, data.speed * 0.016);
@@ -642,9 +716,13 @@ export function mountZoreVirtualOffice(host, options = {}) {
             chooseWalkTarget(o);
           }
         }
-        o.position.y = 0.12 + (moving ? Math.abs(Math.sin(now*0.009 + data.phase))*0.045 : Math.sin(now*0.002 + data.phase)*0.018);
-        data.legs.forEach((leg, index) => { leg.rotation.x = moving ? Math.sin(now*0.012 + data.phase + index*Math.PI)*0.55 : 0; });
-        data.arms.forEach((arm, index) => { arm.rotation.x = moving ? -Math.sin(now*0.012 + data.phase + index*Math.PI)*0.38 : Math.sin(now*0.002 + data.phase)*0.06; });
+        if(!data.seated && data.state!=="chatting")o.position.y=0.12+(moving?Math.abs(Math.sin(now*0.009+data.phase))*0.045:Math.sin(now*0.002+data.phase)*0.018);
+        if(!data.seated){
+          data.legs.forEach((leg,index)=>{leg.rotation.x=moving?Math.sin(now*0.012+data.phase+index*Math.PI)*0.55:0;});
+          data.arms.forEach((arm,index)=>{arm.rotation.x=moving?-Math.sin(now*0.012+data.phase+index*Math.PI)*0.38:Math.sin(now*0.002+data.phase)*0.06;});
+        }else{
+          data.arms.forEach((arm,index)=>{arm.rotation.z=(index===0?-0.12:0.12)+Math.sin(now*0.004+data.phase)*0.08;});
+        }
         if (data.bubble && now > data.bubbleUntil) {
           o.remove(data.bubble); data.bubble.material.map?.dispose(); data.bubble.material.dispose(); data.bubble = null;
         }
