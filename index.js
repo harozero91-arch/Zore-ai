@@ -30,7 +30,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       <div class="zore-office__viewport">
         <div class="zore-office__canvas"></div>
         <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>\n        <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
-        <div class="zore-office__touch-hint">Geser layar untuk melihat sisi kantor · sudut dibatasi</div>
+        <div class="zore-office__touch-hint">Geser satu jari untuk melihat sisi · cubit dua jari untuk zoom</div>
         <label class="zore-office__light">Intensitas cahaya <input data-light type="range" min="0.35" max="2.2" step="0.05" value="1.25"></label>
         <div class="zore-office__help">Tampilan tetap · satu area kantor terbuka</div>
       </div>
@@ -433,7 +433,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     scene.background.set(0x171d28); scene.fog.color.set(0x171d28);
     sun.intensity = 0.28; chandelier.intensity = 65;
   });
-  // Touch / mouse drag camera: bounded orbit, never a 360-degree rotation.
+  // Bounded touch orbit + pinch zoom. Camera cannot rotate freely or zoom indefinitely.
   const orbitTarget = new THREE.Vector3(0, 1.5, 0);
   const initialOffset = camera.position.clone().sub(orbitTarget);
   const spherical = new THREE.Spherical().setFromVector3(initialOffset);
@@ -445,40 +445,76 @@ export function mountZoreVirtualOffice(host, options = {}) {
     maxTheta: baseAzimuth + THREE.MathUtils.degToRad(38),
     minPhi: Math.max(THREE.MathUtils.degToRad(28), basePolar - THREE.MathUtils.degToRad(12)),
     maxPhi: Math.min(THREE.MathUtils.degToRad(72), basePolar + THREE.MathUtils.degToRad(12)),
-    minRadius: spherical.radius * 0.88,
-    maxRadius: spherical.radius * 1.12
+    minRadius: spherical.radius * 0.82,
+    maxRadius: spherical.radius * 1.28
   };
-  let dragPointer = null;
-  let lastX = 0, lastY = 0;
   const touchSurface = renderer.domElement;
+  const pointers = new Map();
+  let lastX = 0, lastY = 0, pinchDistance = 0;
+  const applyCamera = () => {
+    const offset = new THREE.Vector3().setFromSpherical(
+      new THREE.Spherical(orbit.radius, orbit.phi, orbit.theta)
+    );
+    camera.position.copy(orbitTarget).add(offset);
+    camera.lookAt(orbitTarget);
+  };
+  const distanceBetweenPointers = () => {
+    const pts = [...pointers.values()];
+    if (pts.length < 2) return 0;
+    return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+  };
   touchSurface.style.touchAction = "none";
   touchSurface.style.cursor = "grab";
   touchSurface.addEventListener("pointerdown", event => {
     if (event.pointerType === "mouse" && event.button !== 0) return;
-    dragPointer = event.pointerId;
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
     lastX = event.clientX; lastY = event.clientY;
-    touchSurface.style.cursor = "grabbing";
+    if (pointers.size === 2) pinchDistance = distanceBetweenPointers();
+    touchSurface.style.cursor = pointers.size === 1 ? "grabbing" : "zoom-in";
     touchSurface.setPointerCapture(event.pointerId);
   });
   touchSurface.addEventListener("pointermove", event => {
-    if (dragPointer !== event.pointerId) return;
-    const dx = event.clientX - lastX;
-    const dy = event.clientY - lastY;
-    lastX = event.clientX; lastY = event.clientY;
+    if (!pointers.has(event.pointerId)) return;
+    const previous = pointers.get(event.pointerId);
+    pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    if (pointers.size >= 2) {
+      const nextDistance = distanceBetweenPointers();
+      if (pinchDistance > 0 && nextDistance > 0) {
+        // Pinch outward zooms in; pinch inward zooms out, within strict bounds.
+        orbit.radius = THREE.MathUtils.clamp(
+          orbit.radius * (pinchDistance / nextDistance),
+          limits.minRadius,
+          limits.maxRadius
+        );
+      }
+      pinchDistance = nextDistance;
+      applyCamera();
+      return;
+    }
+    const dx = event.clientX - previous.x;
+    const dy = event.clientY - previous.y;
     orbit.theta = THREE.MathUtils.clamp(orbit.theta - dx * 0.005, limits.minTheta, limits.maxTheta);
     orbit.phi = THREE.MathUtils.clamp(orbit.phi + dy * 0.0035, limits.minPhi, limits.maxPhi);
-    const next = new THREE.Vector3().setFromSpherical(new THREE.Spherical(orbit.radius, orbit.phi, orbit.theta));
-    camera.position.copy(orbitTarget).add(next);
-    camera.lookAt(orbitTarget);
+    applyCamera();
   });
-  const stopDrag = event => {
-    if (dragPointer !== event.pointerId) return;
-    dragPointer = null;
+  const stopPointer = event => {
+    pointers.delete(event.pointerId);
+    pinchDistance = pointers.size === 2 ? distanceBetweenPointers() : 0;
     touchSurface.style.cursor = "grab";
   };
-  touchSurface.addEventListener("pointerup", stopDrag);
-  touchSurface.addEventListener("pointercancel", stopDrag);
-  touchSurface.addEventListener("lostpointercapture", stopDrag);
+  touchSurface.addEventListener("pointerup", stopPointer);
+  touchSurface.addEventListener("pointercancel", stopPointer);
+  touchSurface.addEventListener("lostpointercapture", stopPointer);
+  // Desktop wheel zoom follows the same bounded distance limits.
+  touchSurface.addEventListener("wheel", event => {
+    event.preventDefault();
+    orbit.radius = THREE.MathUtils.clamp(
+      orbit.radius * (1 + Math.sign(event.deltaY) * 0.06),
+      limits.minRadius,
+      limits.maxRadius
+    );
+    applyCamera();
+  }, { passive: false });
 
   host.querySelector("[data-light]").addEventListener("input", e => {
     const value = Number(e.target.value);
