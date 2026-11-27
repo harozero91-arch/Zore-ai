@@ -54,7 +54,8 @@ function renderWorkspace(){
   document.querySelector("#profile-panel").addEventListener("click",()=>{});
   document.querySelector("#task-form").addEventListener("submit",assignTask);
   document.querySelector("#refresh-work").addEventListener("click",()=>syncOffice(true));
-  document.querySelector(".work-list").addEventListener("click",handleWorkListClick);
+  app.removeEventListener("click",handleWorkListClick);
+  app.addEventListener("click",handleWorkListClick);
 }
 function selectEmployee(id){selectedEmployee=EMPLOYEE_PROFILES.find(e=>e.id===id)||EMPLOYEE_PROFILES[0];const panel=document.querySelector("#profile-panel");if(panel)panel.innerHTML=renderProfile(selectedEmployee);}
 async function syncOffice(redraw=false){
@@ -72,7 +73,6 @@ async function syncOffice(redraw=false){
       const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
       const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
       updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
-      updated.querySelector(".work-list")?.addEventListener("click",handleWorkListClick);
     }
     const feed=document.querySelector(".activity-feed");
     if(feed) feed.innerHTML='<h2>Aktivitas dan laporan tim</h2>'+(officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>');
@@ -100,7 +100,7 @@ async function handleWorkListClick(event){
   if(deleteButton){
     const taskId=deleteButton.dataset.deleteTask;
     const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
-    if(!task)return;
+    if(!task){showNotice("Tugas tidak ditemukan pada daftar terbaru. Tekan Perbarui lalu coba lagi.","error");return;}
     const title=task.title||"tugas ini";
     if(!confirm(`Hapus tugas "${title}" dari daftar? Tindakan ini tidak dapat dibatalkan.`))return;
     deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
