@@ -273,6 +273,61 @@ export function mountZoreVirtualOffice(host, options = {}) {
   // Living employee agents: distinct appearance, autonomous walking and social conversations.
   const employeeObjects = [];
   const walkBounds = { minX: -18, maxX: 18, minZ: -12, maxZ: 12 };
+  // Collision map: staff must walk around walls, glass dividers and furniture.
+  const solidAreas = [
+    // Outer walls
+    { minX: -21.5, maxX: -20.35, minZ: -15.5, maxZ: 15.5 },
+    { minX: 20.35, maxX: 21.5, minZ: -15.5, maxZ: 15.5 },
+    { minX: -21.5, maxX: 21.5, minZ: -15.55, maxZ: -14.35 },
+    // Glass partitions
+    { minX: -15.48, maxX: -14.92, minZ: -10.45, maxZ: -2.35 },
+    { minX: -11.75, maxX: -5.45, minZ: -10.42, maxZ: -9.78 },
+    { minX: 5.55, maxX: 11.95, minZ: -10.32, maxZ: -9.68 },
+    { minX: 15.02, maxX: 15.58, minZ: -9.9, maxZ: -1.7 },
+    { minX: -15.28, maxX: -14.72, minZ: -0.5, maxZ: 6.7 },
+    { minX: 14.72, maxX: 15.28, minZ: -0.5, maxZ: 6.7 },
+    // Workstation desks (chairs are separate colliders below)
+    ...[[-16.5,-11.2],[-10.7,-11.2],[-16.5,-2.1],[-10.7,-2.1],
+      [10.7,-11.2],[16.5,-11.2],[10.7,-2.1],[16.5,-2.1],
+      [-5.4,-11.2],[0,-11.2],[5.4,-11.2]].map(([x,z]) =>
+        ({ minX:x-1.55,maxX:x+1.55,minZ:z-0.9,maxZ:z+0.9 })),
+    // Meeting table and individual meeting chairs
+    { circleX: 0, circleZ: 1, radius: 2.95 },
+    ...Array.from({length:8},(_,i)=>({circleX:Math.cos(i*Math.PI/4)*3.45,circleZ:1+Math.sin(i*Math.PI/4)*3.45,radius:0.72})),
+    // Reception, lounge sofa and coffee table
+    { minX:-15.2,maxX:-13.4,minZ:8.0,maxZ:12.8 },
+    { minX:7.55,maxX:16.45,minZ:11.45,maxZ:13.65 },
+    { minX:10.15,maxX:13.85,minZ:7.45,maxZ:9.55 },
+    // Indoor plant pots
+    ...[[-19,-13,1.2],[-19,7,1.0],[-7,-14,0.9],[7,-14,0.9],[19,-12,1.1],[19,5,1.0],[-19,13,1.1],[19,14,1.0],[4,7,0.8]]
+      .map(([x,z,r])=>({circleX:x,circleZ:z,radius:0.48*r+0.42}))
+  ];
+  const STAFF_RADIUS = 0.48;
+  function hitsSolidArea(x,z) {
+    return solidAreas.some(area => {
+      if (area.circleX !== undefined) {
+        return Math.hypot(x-area.circleX,z-area.circleZ) < area.radius + STAFF_RADIUS;
+      }
+      return x > area.minX-STAFF_RADIUS && x < area.maxX+STAFF_RADIUS &&
+        z > area.minZ-STAFF_RADIUS && z < area.maxZ+STAFF_RADIUS;
+    });
+  }
+  function hitsAnotherEmployee(x,z, current) {
+    return employeeObjects.some(other => other !== current &&
+      Math.hypot(x-other.position.x,z-other.position.z) < STAFF_RADIUS*1.75);
+  }
+  function chooseWalkTarget(person) {
+    for (let attempt=0; attempt<35; attempt++) {
+      const x=THREE.MathUtils.randFloat(walkBounds.minX,walkBounds.maxX);
+      const z=THREE.MathUtils.randFloat(walkBounds.minZ,walkBounds.maxZ);
+      if (!hitsSolidArea(x,z) && !hitsAnotherEmployee(x,z,person)) {
+        person.userData.target.set(x,0.12,z);
+        return true;
+      }
+    }
+    return false;
+  }
+
   const dialogueLines = [
     ["Bagaimana perkembangan tugasmu?", "Sudah berjalan. Aku sedang memeriksa detailnya."],
     ["Aku punya ide untuk proyek ini.", "Menarik. Coba jelaskan, kita kembangkan bersama."],
@@ -322,7 +377,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   };
   employees.slice(0, 9).forEach((employee, i) => {
     const group = new THREE.Group();
-    const staffSpots = [[-16,-12],[-10,-2],[-16,-2],[-10,-12],[10,-12],[16,-12],[10,-2],[16,-2],[-5,-7]];
+    const staffSpots = [[-13,-8],[-8,-7],[-13,0],[-8,1],[8,-8],[13,-8],[8,0],[13,1],[-4,7]];
     const [staffX, staffZ] = staffSpots[i] || [0,0];
     group.position.set(staffX, 0.12, staffZ);
     const outfitColor = employee.accent || (i % 2 ? "#345c50" : "#70513a");
@@ -552,10 +607,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         if (now > socialState.until) {
           for (const person of [a, b]) {
             person.userData.partner = null; person.userData.state = "walking";
-            person.userData.target.set(
-              THREE.MathUtils.randFloat(walkBounds.minX, walkBounds.maxX), 0.12,
-              THREE.MathUtils.randFloat(walkBounds.minZ, walkBounds.maxZ)
-            );
+            chooseWalkTarget(person);
             if (person.userData.bubble) { person.remove(person.userData.bubble); person.userData.bubble = null; }
           }
           socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(8500, 14500);
@@ -569,16 +621,21 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const data = o.userData;
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
-        if (distance < 0.35 && !data.partner) {
-          data.target.set(THREE.MathUtils.randFloat(walkBounds.minX, walkBounds.maxX), 0.12,
-            THREE.MathUtils.randFloat(walkBounds.minZ, walkBounds.maxZ));
-        }
+        if (distance < 0.35 && !data.partner) chooseWalkTarget(o);
         const moving = distance > 0.18;
         if (moving) {
           delta.normalize();
           const step = Math.min(distance, data.speed * 0.016);
-          o.position.addScaledVector(delta, step);
-          o.rotation.y = Math.atan2(delta.x, delta.z);
+          const nextX = o.position.x + delta.x * step;
+          const nextZ = o.position.z + delta.z * step;
+          // Stop before entering furniture or walls; pick a clear alternate route.
+          if (!hitsSolidArea(nextX,nextZ) && !hitsAnotherEmployee(nextX,nextZ,o)) {
+            o.position.x = nextX;
+            o.position.z = nextZ;
+            o.rotation.y = Math.atan2(delta.x, delta.z);
+          } else if (!data.partner) {
+            chooseWalkTarget(o);
+          }
         }
         o.position.y = 0.12 + (moving ? Math.abs(Math.sin(now*0.009 + data.phase))*0.045 : Math.sin(now*0.002 + data.phase)*0.018);
         data.legs.forEach((leg, index) => { leg.rotation.x = moving ? Math.sin(now*0.012 + data.phase + index*Math.PI)*0.55 : 0; });
