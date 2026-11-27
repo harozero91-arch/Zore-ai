@@ -409,7 +409,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     "AI Storyboard Artist": "panel storyboard dan kamera",
     "AI Character Designer": "desain karakter dan kostum",
     "AI Background Artist": "latar dan atmosfer visual",
-    "AI 2D Animator": "gerakan dan timing animasi",
+    "AI 2D Animator": "animasi 2D/3D tingkat senior, rigging, motion design, dan coding pipeline kreatif",
     "AI Cleanup & Color Artist": "cleanup dan konsistensi warna",
     "AI Graphic Designer & Video Editor": "aset grafis, kode, dan editing video"
   };
