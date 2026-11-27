@@ -391,7 +391,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
-    sprite.scale.set(5.2, 1.35, 1); sprite.position.y = 3.25;
+    sprite.scale.set(7.0, 1.75, 1); sprite.position.y = 3.65;
     sprite.userData.texture = texture;
     return sprite;
   };
@@ -579,17 +579,20 @@ export function mountZoreVirtualOffice(host, options = {}) {
       meetingButton.textContent="▣ Mulai rapat";label.textContent="Kantor Terpadu · Semua Divisi";
     }
   }
-  const socialState = { nextAt: 5, pair: null, until: 0, turn: 0, nextSpeechAt: 0 };
+  const socialState = { nextAt: 3500, pair: null, until: 0, turn: 0, nextSpeechAt: 0 };
   function beginConversation(now) {
-    if(employeeObjects.length<2)return;
-    const firstIndex=Math.floor(Math.random()*employeeObjects.length);
-    const first=employeeObjects[firstIndex];
-    if(first.userData.state!=="walking")return;
-    const eligible=employeeObjects.filter((candidate,index)=>index!==firstIndex&&candidate.userData.state==="walking"&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
-    const fallback=employeeObjects.find((candidate,index)=>index!==firstIndex&&candidate.userData.state==="walking");
-    const second=eligible.length?eligible[Math.floor(Math.random()*eligible.length)]:fallback;
-    if(!second)return;
-    const sitDown=Math.random()<0.68;
+    // Choose from employees who are genuinely free, then prefer colleagues
+    // whose roles naturally collaborate. This avoids random busy employees
+    // repeatedly cancelling the conversation scheduler.
+    const available=employeeObjects.filter(person=>person.userData.state==="walking"&&!person.userData.partner);
+    if(available.length<2){socialState.nextAt=now+2500;return;}
+    const first=available[Math.floor(Math.random()*available.length)];
+    const related=available.filter(candidate=>candidate!==first&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
+    const pool=related.length?related:available.filter(candidate=>candidate!==first);
+    const second=pool[Math.floor(Math.random()*pool.length)];
+    if(!second){socialState.nextAt=now+2500;return;}
+    // Most chats happen face-to-face in the open office; some move to the lounge.
+    const sitDown=Math.random()<0.35;
     const midpoint=first.position.clone().add(second.position).multiplyScalar(0.5);
     const targets=sitDown?loungeSeats.map(seat=>new THREE.Vector3(seat.x,0.12,seat.z)):[
       midpoint.clone().add(new THREE.Vector3(-0.9,0,0)),
@@ -609,8 +612,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
     socialState.mode=sitDown?"seated":"standing";
     socialState.pair=[first,second];
     socialState.turn=0;
-    socialState.nextSpeechAt=now+(sitDown?4200:1800);
-    socialState.until=now+(sitDown?26000:16000);
+    socialState.nextSpeechAt=now+(sitDown?3000:1200);
+    socialState.until=now+(sitDown?28000:24000);
   }
 
   function showSpeech(person, message, now) {
@@ -622,7 +625,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const bubble = makeBubble(message);
     person.add(bubble);
     person.userData.bubble = bubble;
-    person.userData.bubbleUntil = now + 3600;
+    person.userData.bubbleUntil = now + 5800;
   }
 
   const raycaster = new THREE.Raycaster();
@@ -772,7 +775,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
             chooseWalkTarget(person);
             if (person.userData.bubble) { person.remove(person.userData.bubble); person.userData.bubble = null; }
           }
-          socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(8500, 14500);
+          socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(5500, 9000);
         } else if(socialState.mode!=="seated" || (a.position.distanceTo(a.userData.target)<0.45 && b.position.distanceTo(b.userData.target)<0.45)){
           if(socialState.mode==="seated" && a.userData.state!=="chatting"){
             for(const person of [a,b]){
