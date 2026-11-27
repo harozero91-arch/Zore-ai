@@ -391,7 +391,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
-    sprite.scale.set(5.0, 1.25, 1); sprite.position.y = 3.05;
+    sprite.scale.set(5.2, 1.35, 1); sprite.position.y = 3.25;
     sprite.userData.texture = texture;
     return sprite;
   };
@@ -579,7 +579,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       meetingButton.textContent="▣ Mulai rapat";label.textContent="Kantor Terpadu · Semua Divisi";
     }
   }
-  const socialState = { nextAt: 5, pair: null, until: 0 };
+  const socialState = { nextAt: 5, pair: null, until: 0, turn: 0, nextSpeechAt: 0 };
   function beginConversation(now) {
     if(employeeObjects.length<2)return;
     const firstIndex=Math.floor(Math.random()*employeeObjects.length);
@@ -607,7 +607,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
     first.userData.conversation=lines[0];
     second.userData.conversation=lines[1];
     socialState.mode=sitDown?"seated":"standing";
-    socialState.pair=[first,second];socialState.until=now+(sitDown?26000:16000);
+    socialState.pair=[first,second];
+    socialState.turn=0;
+    socialState.nextSpeechAt=now+(sitDown?4200:1800);
+    socialState.until=now+(sitDown?26000:16000);
   }
 
   function showSpeech(person, message, now) {
@@ -770,16 +773,21 @@ export function mountZoreVirtualOffice(host, options = {}) {
             if (person.userData.bubble) { person.remove(person.userData.bubble); person.userData.bubble = null; }
           }
           socialState.pair = null; socialState.nextAt = now + THREE.MathUtils.randFloat(8500, 14500);
-        } else if(!a.userData.spoke && (socialState.mode!=="seated" || (a.position.distanceTo(a.userData.target)<0.45 && b.position.distanceTo(b.userData.target)<0.45))){
-          if(socialState.mode==="seated"){
+        } else if(socialState.mode!=="seated" || (a.position.distanceTo(a.userData.target)<0.45 && b.position.distanceTo(b.userData.target)<0.45)){
+          if(socialState.mode==="seated" && a.userData.state!=="chatting"){
             for(const person of [a,b]){
               const seat=person.userData.seat;
               if(seat){person.position.set(seat.x,0.5,seat.z);person.rotation.y=seat.yaw;setSeatedPose(person,true);person.userData.state="chatting";}
             }
           }
-          showSpeech(a,a.userData.conversation,now);
-          showSpeech(b,b.userData.conversation,now+1600);
-          a.userData.spoke=b.userData.spoke=true;
+          // Take turns speaking so each employee's line is readable above their head.
+          if(now>=socialState.nextSpeechAt && socialState.turn<2){
+            const speaker=socialState.turn===0?a:b;
+            showSpeech(speaker,speaker.userData.conversation,now);
+            socialState.turn++;
+            socialState.nextSpeechAt=now+3900;
+            if(socialState.turn>=2){a.userData.spoke=b.userData.spoke=true;}
+          }
         }
       }
       employeeObjects.forEach((o, i) => {
