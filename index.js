@@ -181,7 +181,6 @@ export function mountZoreVirtualOffice(host, options = {}) {
     if (disposed) return;
     frame = requestAnimationFrame(animate);
     if (!reducedMotion) {
-      chandelierGroup.rotation.y += 0.0008;
       employeeObjects.forEach((o, i) => { o.position.y = 0.12 + Math.sin(performance.now()*0.001 + i)*0.025; });
     }
     renderer.render(scene, camera);
@@ -194,7 +193,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       console.info("ZORE Office: panggil mount ulang dengan array karyawan terbaru.", nextEmployees?.length || 0);
     },
     destroy() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect(); controls.dispose();
+      disposed = true; cancelAnimationFrame(frame); observer.disconnect();
       if (audio) { audio.pause(); audio.src = ""; }
       renderer.dispose();
       host.innerHTML = ""; host.classList.remove("zore-office");
