@@ -511,10 +511,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
     person.userData.spoke=false;
     setSeatedPose(person,false);
     person.userData.target.set(seat.x,0.12,seat.z);
-    person.userData.workUntil=now+THREE.MathUtils.randFloat(14000,23000);
+    person.userData.workUntil=now+THREE.MathUtils.randFloat(25000,40000);
   }
   function startDeskActivity(now){
-    const available=employeeObjects.filter(p=>!p.userData.partner&&!p.userData.seated&&p.userData.state==="walking");
+    const available=employeeObjects.filter(p=>!p.userData.partner&&!p.userData.seated&&(p.userData.state==="walking"||p.userData.state==="idle"));
     if(!available.length)return;
     const person=available[Math.floor(Math.random()*available.length)];
     sendEmployeeToDesk(person,now);
@@ -524,7 +524,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const meetingButton=host.querySelector('[data-action="meeting"]');
   function startTeamMeeting(now){
     if(meetingState.active || employeeObjects.length<2)return;
-    const available=employeeObjects.filter(p=>!p.userData.partner && (p.userData.state==="walking" || p.userData.state==="working"));
+    const available=employeeObjects.filter(p=>!p.userData.partner && (p.userData.state==="walking" || p.userData.state==="idle" || p.userData.state==="working"));
     if(available.length<2)return;
     const chosen=available.slice().sort(()=>Math.random()-0.5).slice(0,Math.min(8,available.length));
     const lead=chosen.find(p=>p.userData.employee.role==="AI Creative Manager")||chosen[0];
@@ -584,7 +584,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     // Choose from employees who are genuinely free, then prefer colleagues
     // whose roles naturally collaborate. This avoids random busy employees
     // repeatedly cancelling the conversation scheduler.
-    const available=employeeObjects.filter(person=>person.userData.state==="walking"&&!person.userData.partner);
+    const available=employeeObjects.filter(person=>(person.userData.state==="walking"||person.userData.state==="idle")&&!person.userData.partner);
     if(available.length<2){socialState.nextAt=now+2500;return;}
     const first=available[Math.floor(Math.random()*available.length)];
     const related=available.filter(candidate=>candidate!==first&&(collabRoles[first.userData.employee.role]||[]).includes(candidate.userData.employee.role));
@@ -798,7 +798,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const delta = data.target.clone().sub(o.position); delta.y = 0;
         const distance = delta.length();
         // Preserve reserved destinations while an employee is approaching a desk or meeting seat.
-        if (distance < 0.35 && !data.partner && data.state === "walking") chooseWalkTarget(o);
+        if (distance < 0.35 && !data.partner && data.state === "walking") { data.state="idle"; data.idleUntil=now+THREE.MathUtils.randFloat(7000,14000); }\n        if (data.state==="idle" && now >= (data.idleUntil||0)) { data.state="walking"; chooseWalkTarget(o); }
         if(data.state==="going_to_meeting" && distance<0.48 && data.meetingSeat){
           o.position.set(data.meetingSeat.x,0.5,data.meetingSeat.z);
           o.rotation.y=data.meetingSeat.yaw;
