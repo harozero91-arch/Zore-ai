@@ -1,5 +1,7 @@
 
 import "./styles.css";
+import "../office.css";
+import { mountZoreVirtualOffice } from "../index.js";
 
 import {
   EMPLOYEE_PROFILES,
@@ -10,11 +12,14 @@ import {
 const app = document.querySelector("#app");
 
 let selectedEmployee = EMPLOYEE_PROFILES[0];
+
 let currentTask = {
   title: "Menunggu tugas",
   description: ""
 };
+
 let currentEvent = "";
+let officeInstance = null;
 
 function renderEmployee(employee) {
   const state = getCharacterState(
@@ -22,8 +27,6 @@ function renderEmployee(employee) {
     currentTask,
     currentEvent
   );
-
-  const collaborators = getCollaborators(employee.id);
 
   return `
     <article class="employee-card"
@@ -53,13 +56,16 @@ function renderEmployee(employee) {
       <div class="employee-info">
         <h3>${employee.name}</h3>
         <p>${employee.role}</p>
+
         <span class="employee-traits">
           ${employee.traits.join(" · ")}
         </span>
+
         <div class="employee-status">
           <span class="status-dot"></span>
           ${state.activity}
         </div>
+
         <button class="detail-button"
           data-select="${employee.id}">
           Lihat profil
@@ -118,14 +124,69 @@ function renderProfile(employee) {
   `;
 }
 
+function selectEmployee(employeeId) {
+  const employee = EMPLOYEE_PROFILES.find(
+    person => person.id === employeeId
+  );
+
+  if (!employee) return;
+
+  selectedEmployee = employee;
+
+  const profilePanel = document.querySelector("#profile-panel");
+
+  if (profilePanel) {
+    profilePanel.innerHTML = renderProfile(employee);
+  }
+}
+
+function connectVirtualOffice() {
+  const host = document.querySelector("#zore-office-mount");
+
+  if (!host) {
+    console.error("Tempat kantor virtual 3D tidak ditemukan.");
+    return;
+  }
+
+  try {
+    officeInstance = mountZoreVirtualOffice(host, {
+      employees: EMPLOYEE_PROFILES,
+
+      onEmployeeSelect: employee => {
+        selectEmployee(employee.id);
+      },
+
+      onRoomChange: room => {
+        console.info("Ruangan aktif:", room.name);
+      }
+    });
+  } catch (error) {
+    console.error("Kantor virtual gagal dimuat:", error);
+    host.innerHTML = `
+      <p style="padding:20px;color:#8b2d20">
+        Kantor 3D gagal dimuat. Periksa koneksi dan dukungan WebGL.
+      </p>
+    `;
+  }
+}
+
 function render() {
+  if (officeInstance) {
+    officeInstance.destroy();
+    officeInstance = null;
+  }
+
   app.innerHTML = `
     <header class="topbar">
       <div>
-        <span class="eyebrow">VIRTUAL MANAGEMENT SYSTEM</span>
+        <span class="eyebrow">
+          VIRTUAL MANAGEMENT SYSTEM
+        </span>
+
         <h1>ZORE <span>AI</span></h1>
         <p>Kantor Virtual Cerdas</p>
       </div>
+
       <div class="office-indicator">
         <span></span> KANTOR AKTIF
       </div>
@@ -134,14 +195,26 @@ function render() {
     <main>
       <section class="office-intro">
         <span>EXECUTIVE OFFICE</span>
+
         <h2>Selamat datang di kantor ZORE</h2>
-        <p>Sembilan karakter karyawan dengan peran dan kepribadian berbeda.</p>
+
+        <p>
+          Sembilan karakter karyawan dengan peran
+          dan kepribadian berbeda.
+        </p>
+      </section>
+
+      <section class="virtual-office-section">
+        <div id="zore-office-mount"></div>
       </section>
 
       <section class="task-panel">
         <h3>Berikan tugas kepada karyawan</h3>
-        <input id="task-input"
-          placeholder="Contoh: Menganalisis data perusahaan">
+
+        <input
+          id="task-input"
+          placeholder="Contoh: Menganalisis data perusahaan"
+        >
 
         <select id="employee-select">
           ${EMPLOYEE_PROFILES.map(person => `
@@ -159,7 +232,9 @@ function render() {
           <option value="positive_feedback">Umpan balik positif</option>
         </select>
 
-        <button id="assign-task">Jalankan aktivitas</button>
+        <button id="assign-task">
+          Jalankan aktivitas
+        </button>
       </section>
 
       <section class="team-section">
@@ -168,6 +243,7 @@ function render() {
             <span>OUR TEAM</span>
             <h2>Tim Karyawan</h2>
           </div>
+
           <span>09 PERSONEL</span>
         </div>
 
@@ -186,31 +262,36 @@ function render() {
     </footer>
   `;
 
+  connectVirtualOffice();
+
   document.querySelectorAll("[data-select]").forEach(button => {
     button.addEventListener("click", () => {
-      const employee = EMPLOYEE_PROFILES.find(
-        person => person.id === button.dataset.select
-      );
-
-      if (employee) {
-        selectedEmployee = employee;
-        document.querySelector("#profile-panel").innerHTML =
-          renderProfile(employee);
-      }
+      selectEmployee(button.dataset.select);
     });
   });
 
   document.querySelector("#assign-task").addEventListener("click", () => {
-    const title = document.querySelector("#task-input").value.trim();
-    const employeeId = document.querySelector("#employee-select").value;
+    const title = document
+      .querySelector("#task-input")
+      .value.trim();
+
+    const employeeId = document
+      .querySelector("#employee-select")
+      .value;
 
     if (!title) {
       alert("Masukkan tugas terlebih dahulu.");
       return;
     }
 
-    currentTask = { title, description: "" };
-    currentEvent = document.querySelector("#event-select").value;
+    currentTask = {
+      title,
+      description: ""
+    };
+
+    currentEvent = document
+      .querySelector("#event-select")
+      .value;
 
     selectedEmployee = EMPLOYEE_PROFILES.find(
       person => person.id === employeeId
