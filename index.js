@@ -242,13 +242,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
       );
       person.userData.partner = person === first ? second : first;
       person.userData.state = "meeting";
+      person.userData.spoke = false;
     }
     const lines = dialogueLines[Math.floor(Math.random() * dialogueLines.length)];
     const topicA = roleTopics[first.userData.employee.role] || "pekerjaan";
     const topicB = roleTopics[second.userData.employee.role] || "pekerjaan";
     first.userData.conversation = lines[0].replace("proyek ini", topicA);
     second.userData.conversation = lines[1].replace("datanya", topicB);
-    socialState.pair = [first, second]; socialState.until = now + 9000;
+    socialState.pair = [first, second]; socialState.until = now + 18000;
   }
 
   function showSpeech(person, message, now) {
