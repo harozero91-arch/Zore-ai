@@ -421,20 +421,43 @@ export function mountZoreVirtualOffice(host, options = {}) {
     "AI Graphic Designer & Video Editor": ["AI Cleanup & Color Artist", "AI Creative Manager"]
   };
   const makeBubble = (message) => {
+    // Render dialogue at high resolution and wrap it into readable lines.
     const canvas = document.createElement("canvas");
-    canvas.width = 512; canvas.height = 128;
+    canvas.width = 1024; canvas.height = 320;
     const ctx = canvas.getContext("2d");
-    ctx.fillStyle = "rgba(255,249,232,0.97)";
-    ctx.strokeStyle = "#c7a56a"; ctx.lineWidth = 7;
-    ctx.beginPath(); ctx.roundRect(8, 8, 496, 108, 25); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#35251b"; ctx.font = "bold 30px Arial";
-    let text = message;
-    while (ctx.measureText(text).width > 450 && text.length > 8) text = text.slice(0, -2) + "…";
-    ctx.fillText(text, 28, 72);
+    ctx.imageSmoothingEnabled = true;
+    ctx.fillStyle = "rgba(255,252,242,0.99)";
+    ctx.strokeStyle = "#a98248"; ctx.lineWidth = 10;
+    ctx.beginPath(); ctx.roundRect(12, 12, 1000, 296, 34); ctx.fill(); ctx.stroke();
+    ctx.fillStyle = "#24180f";
+    ctx.font = "bold 48px Arial";
+    ctx.textAlign = "left"; ctx.textBaseline = "middle";
+    const words = String(message || "").trim().split(/\\s+/);
+    const lines = [];
+    let line = "";
+    for (const word of words) {
+      const candidate = line ? line + " " + word : word;
+      if (ctx.measureText(candidate).width > 900 && line) {
+        lines.push(line); line = word;
+      } else line = candidate;
+    }
+    if (line) lines.push(line);
+    const visibleLines = lines.slice(0, 3);
+    if (lines.length > 3) {
+      let last = visibleLines[2];
+      while (ctx.measureText(last + "…").width > 880 && last.length) last = last.slice(0, -1);
+      visibleLines[2] = last.trimEnd() + "…";
+    }
+    const lineHeight = 76;
+    const startY = 160 - ((visibleLines.length - 1) * lineHeight) / 2;
+    visibleLines.forEach((text, index) => ctx.fillText(text, 54, startY + index * lineHeight));
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
+    texture.minFilter = THREE.LinearFilter;
+    texture.magFilter = THREE.LinearFilter;
+    texture.generateMipmaps = true;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
-    sprite.scale.set(8.2, 2.05, 1); sprite.position.y = 3.75;
+    sprite.scale.set(7.8, 2.44, 1); sprite.position.y = 3.85;
     sprite.userData.texture = texture;
     return sprite;
   };
