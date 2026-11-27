@@ -545,9 +545,15 @@ export function mountZoreVirtualOffice(host, options = {}) {
     {x:10.7,z:-3.75,yaw:0},{x:16.5,z:-3.75,yaw:0},
     {x:-5.4,z:-9.55,yaw:Math.PI},{x:0,z:-9.55,yaw:Math.PI},{x:5.4,z:-9.55,yaw:Math.PI}
   ];
+  // Each employee receives one permanent workstation, in the same order as the employee roster.
+  // A worker always returns to this assigned chair instead of choosing a random desk.
+  employeeObjects.forEach((person,index)=>{
+    person.userData.assignedSeat={...deskSeats[index % deskSeats.length],index:index % deskSeats.length};
+  });
   let nextWorkActivity=12;
   function sendEmployeeToDesk(person,now){
-    const seat=deskSeats[Math.floor(Math.random()*deskSeats.length)];
+    const seat=person.userData.assignedSeat;
+    if(!seat)return; 
     person.userData.seat={...seat};
     person.userData.state="going_to_desk";
     person.userData.partner=null;
