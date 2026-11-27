@@ -26,7 +26,7 @@ function renderAuth(message=""){
   document.querySelector("#signup-button").addEventListener("click",async()=>{
     const email=document.querySelector("#auth-email").value.trim(); const password=document.querySelector("#auth-password").value;
     if(!email||password.length<6){document.querySelector("#auth-message").textContent="Isi email dan kata sandi minimal 6 karakter terlebih dahulu.";return;}
-    const {error,data}=await supabase.auth.signUp({email,password});
+    const {error,data}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin}});
     document.querySelector("#auth-message").textContent=error?error.message:(data.session?"Akun dibuat. Menyiapkan kantor…":"Akun dibuat. Periksa email untuk konfirmasi, lalu masuk.");
   });
 }
@@ -68,7 +68,14 @@ async function syncOffice(redraw=false){
   if(redraw)renderWorkspace();
   else {
     const monitor=document.querySelector(".work-monitor");
-    if(monitor){const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();monitor.replaceWith(temp.querySelector(".work-monitor"));}
+    if(monitor){
+      const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
+      const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
+      updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
+      updated.querySelector(".work-list")?.addEventListener("click",handleReview);
+    }
+    const feed=document.querySelector(".activity-feed");
+    if(feed) feed.innerHTML='<h2>Aktivitas dan laporan tim</h2>'+(officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>');
   }
 }
 function renderWorkspaceSnapshot(){
