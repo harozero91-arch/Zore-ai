@@ -19,6 +19,7 @@ let currentTask = {
 };
 
 let currentEvent = "";
+let taskDraft = "";
 let officeInstance = null;
 
 function renderEmployee(employee) {
@@ -213,7 +214,9 @@ function render() {
 
         <input
           id="task-input"
+          value="${taskDraft.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;")}"
           placeholder="Contoh: Menganalisis data perusahaan"
+          autocomplete="off"
         >
 
         <select id="employee-select">
@@ -232,7 +235,7 @@ function render() {
           <option value="positive_feedback">Umpan balik positif</option>
         </select>
 
-        <button id="assign-task">
+        <button id="assign-task" type="button">
           Jalankan aktivitas
         </button>
       </section>
@@ -270,32 +273,35 @@ function render() {
     });
   });
 
-  document.querySelector("#assign-task").addEventListener("click", () => {
-    const title = document
-      .querySelector("#task-input")
-      .value.trim();
+  const taskInput = document.querySelector("#task-input");
 
-    const employeeId = document
-      .querySelector("#employee-select")
-      .value;
+  taskInput.addEventListener("input", event => {
+    taskDraft = event.target.value;
+  });
+
+  document.querySelector("#assign-task").addEventListener("click", event => {
+    event.preventDefault();
+
+    const title = (taskInput.value || taskDraft || "").trim();
+    const employeeId = document.querySelector("#employee-select").value;
 
     if (!title) {
       alert("Masukkan tugas terlebih dahulu.");
+      taskInput.focus();
       return;
     }
 
+    taskDraft = "";
     currentTask = {
       title,
       description: ""
     };
 
-    currentEvent = document
-      .querySelector("#event-select")
-      .value;
+    currentEvent = document.querySelector("#event-select").value;
 
     selectedEmployee = EMPLOYEE_PROFILES.find(
       person => person.id === employeeId
-    );
+    ) || EMPLOYEE_PROFILES[0];
 
     render();
   });
