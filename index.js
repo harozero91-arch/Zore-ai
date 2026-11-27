@@ -30,11 +30,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       <div class="zore-office__viewport">
         <div class="zore-office__canvas"></div>
         <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>\n        <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
-        <div class="zore-office__views" aria-label="Sudut pandang kantor">
-          <button type="button" data-view="front" class="is-active">Depan</button>
-          <button type="button" data-view="left">Sektor kiri</button>
-          <button type="button" data-view="right">Sektor kanan</button>
-        </div>
+        <div class="zore-office__touch-hint">Geser layar untuk melihat sisi kantor · sudut dibatasi</div>
         <label class="zore-office__light">Intensitas cahaya <input data-light type="range" min="0.35" max="2.2" step="0.05" value="1.25"></label>
         <div class="zore-office__help">Tampilan tetap · satu area kantor terbuka</div>
       </div>
@@ -437,22 +433,52 @@ export function mountZoreVirtualOffice(host, options = {}) {
     scene.background.set(0x171d28); scene.fog.color.set(0x171d28);
     sun.intensity = 0.28; chandelier.intensity = 65;
   });
-  // Elevated fixed viewpoints stay inside the open-plan footprint so side walls
-  // do not block the view into the roofless office.
-  const viewPositions = {
-    front: new THREE.Vector3(0, 27, 36),
-    left: new THREE.Vector3(-16, 29, 9),
-    right: new THREE.Vector3(16, 29, 9)
+  // Touch / mouse drag camera: bounded orbit, never a 360-degree rotation.
+  const orbitTarget = new THREE.Vector3(0, 1.5, 0);
+  const initialOffset = camera.position.clone().sub(orbitTarget);
+  const spherical = new THREE.Spherical().setFromVector3(initialOffset);
+  const baseAzimuth = spherical.theta;
+  const basePolar = spherical.phi;
+  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius };
+  const limits = {
+    minTheta: baseAzimuth - THREE.MathUtils.degToRad(38),
+    maxTheta: baseAzimuth + THREE.MathUtils.degToRad(38),
+    minPhi: Math.max(THREE.MathUtils.degToRad(28), basePolar - THREE.MathUtils.degToRad(12)),
+    maxPhi: Math.min(THREE.MathUtils.degToRad(72), basePolar + THREE.MathUtils.degToRad(12)),
+    minRadius: spherical.radius * 0.88,
+    maxRadius: spherical.radius * 1.12
   };
-  host.querySelectorAll("[data-view]").forEach(button => {
-    button.addEventListener("click", () => {
-      const position = viewPositions[button.dataset.view];
-      if (!position) return;
-      camera.position.copy(position);
-      camera.lookAt(0, 1.5, 0);
-      host.querySelectorAll("[data-view]").forEach(item => item.classList.toggle("is-active", item === button));
-    });
+  let dragPointer = null;
+  let lastX = 0, lastY = 0;
+  const touchSurface = renderer.domElement;
+  touchSurface.style.touchAction = "none";
+  touchSurface.style.cursor = "grab";
+  touchSurface.addEventListener("pointerdown", event => {
+    if (event.pointerType === "mouse" && event.button !== 0) return;
+    dragPointer = event.pointerId;
+    lastX = event.clientX; lastY = event.clientY;
+    touchSurface.style.cursor = "grabbing";
+    touchSurface.setPointerCapture(event.pointerId);
   });
+  touchSurface.addEventListener("pointermove", event => {
+    if (dragPointer !== event.pointerId) return;
+    const dx = event.clientX - lastX;
+    const dy = event.clientY - lastY;
+    lastX = event.clientX; lastY = event.clientY;
+    orbit.theta = THREE.MathUtils.clamp(orbit.theta - dx * 0.005, limits.minTheta, limits.maxTheta);
+    orbit.phi = THREE.MathUtils.clamp(orbit.phi + dy * 0.0035, limits.minPhi, limits.maxPhi);
+    const next = new THREE.Vector3().setFromSpherical(new THREE.Spherical(orbit.radius, orbit.phi, orbit.theta));
+    camera.position.copy(orbitTarget).add(next);
+    camera.lookAt(orbitTarget);
+  });
+  const stopDrag = event => {
+    if (dragPointer !== event.pointerId) return;
+    dragPointer = null;
+    touchSurface.style.cursor = "grab";
+  };
+  touchSurface.addEventListener("pointerup", stopDrag);
+  touchSurface.addEventListener("pointercancel", stopDrag);
+  touchSurface.addEventListener("lostpointercapture", stopDrag);
 
   host.querySelector("[data-light]").addEventListener("input", e => {
     const value = Number(e.target.value);
