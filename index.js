@@ -572,6 +572,73 @@ export function mountZoreVirtualOffice(host, options = {}) {
     {x:10.7,z:-3.75,yaw:0},{x:16.5,z:-3.75,yaw:0},
     {x:-5.4,z:-9.55,yaw:Math.PI},{x:0,z:-9.55,yaw:Math.PI},{x:5.4,z:-9.55,yaw:Math.PI}
   ];
+
+  // Nine named personal studios: one dedicated visual workspace per roster member.
+  // The studios use distinct floor inlays, identity plaques and role-specific equipment
+  // while preserving the existing open-plan architecture, walkways and furniture layout.
+  const studioSpecs = [
+    {title:"ARKA ZORE · CEO",subtitle:"EXECUTIVE STRATEGY OFFICE",color:0xc7a56a,kind:"executive"},
+    {title:"NADIA PRATAMA",subtitle:"CREATIVE MANAGEMENT OFFICE",color:0x4b78a8,kind:"manager"},
+    {title:"RAKA WIBISONO",subtitle:"SCRIPTWRITING STUDIO",color:0x58a6a6,kind:"writing"},
+    {title:"SINTA MAHARANI",subtitle:"STORYBOARD STUDIO",color:0x8a78b8,kind:"storyboard"},
+    {title:"BIMA SANTOSO",subtitle:"CHARACTER DESIGN ATELIER",color:0xe2a34a,kind:"character"},
+    {title:"LARAS AYU",subtitle:"ENVIRONMENT ART STUDIO",color:0x7c9a58,kind:"environment"},
+    {title:"DIMAS KURNIAWAN",subtitle:"2D · 3D · CODING · DUBBING",color:0x58a6a6,kind:"animation"},
+    {title:"PUTRI ANINDYA",subtitle:"CLEANUP & COLOR STUDIO",color:0xc078a0,kind:"color"},
+    {title:"FAJAR NUGROHO",subtitle:"GRAPHIC & VIDEO SUITE",color:0xb58b65,kind:"multimedia"}
+  ];
+  function addStudioPlaque(x,z,spec){
+    const canvas=document.createElement("canvas");canvas.width=900;canvas.height=220;
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#211b18";ctx.fillRect(0,0,900,220);
+    ctx.strokeStyle="#c7a56a";ctx.lineWidth=9;ctx.strokeRect(10,10,880,200);
+    ctx.fillStyle="#f4efdf";ctx.textAlign="center";ctx.textBaseline="middle";
+    ctx.font="bold 42px Arial";ctx.fillText(spec.title,450,83,830);
+    ctx.fillStyle="#d9bd87";ctx.font="bold 25px Arial";ctx.fillText(spec.subtitle,450,151,830);
+    const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;
+    const plaque=new THREE.Mesh(new THREE.PlaneGeometry(4.6,1.12),
+      new THREE.MeshBasicMaterial({map:texture,toneMapped:false}));
+    plaque.position.set(x,3.0,z);plaque.rotation.y=0;building.add(plaque);
+  }
+  function addStudioEquipment(seat,spec,index){
+    const x=seat.x,z=seat.z-1.45;
+    const accent=material(spec.color,0.38,0.22);
+    // Individual desk identity strip and specialist equipment, kept clear of the chair path.
+    box(building,x,1.055,z+0.48,1.05,0.045,0.34,accent,false);
+    if(spec.kind==="executive"||spec.kind==="manager"){
+      addMonitor(x-0.82,z-0.08,seat.yaw,0.68);
+      addMonitor(x+0.82,z-0.08,seat.yaw,0.68);
+      box(building,x,1.12,z+0.05,0.62,0.045,0.42,accent,false);
+    }else if(spec.kind==="writing"){
+      for(let n=0;n<3;n++)box(building,x-0.8+n*0.32,1.13,z+0.42,0.24,0.16,0.34,accent,false);
+      box(building,x+0.9,1.13,z+0.12,0.68,0.055,0.46,darkMat,false);
+    }else if(spec.kind==="storyboard"||spec.kind==="character"||spec.kind==="environment"||spec.kind==="color"){
+      box(building,x+0.88,1.13,z+0.1,0.9,0.045,0.62,accent,false);
+      for(let n=0;n<4;n++)box(building,x-0.95+n*0.34,1.14,z+0.42,0.27,0.035,0.24,n%2?accent:goldMat,false);
+    }else if(spec.kind==="animation"){
+      addMonitor(x-0.92,z-0.08,seat.yaw,0.66);
+      addMonitor(x,z-0.08,seat.yaw,0.66);
+      addMonitor(x+0.92,z-0.08,seat.yaw,0.66);
+      // Compact acoustic recording station: microphone, stand and audio interface.
+      cylinder(building,x+1.12,1.22,z+0.5,0.075,0.075,0.34,darkMat);
+      box(building,x+1.12,1.43,z+0.5,0.16,0.22,0.16,accent,false);
+      box(building,x-1.15,1.12,z+0.48,0.55,0.12,0.38,darkMat,false);
+    }else if(spec.kind==="multimedia"){
+      addMonitor(x-0.65,z-0.08,seat.yaw,0.72);
+      addMonitor(x+0.65,z-0.08,seat.yaw,0.72);
+      box(building,x,1.12,z+0.5,0.78,0.07,0.34,accent,false);
+    }
+    // A small floor inset marks the employee's own studio without enclosing the walkway.
+    const inset=new THREE.Mesh(new THREE.PlaneGeometry(5.0,4.1),
+      material(spec.color,0.9,0.02));
+    inset.rotation.x=-Math.PI/2;inset.position.set(seat.x,0.252,seat.z-0.15);
+    inset.material.transparent=true;inset.material.opacity=0.11;building.add(inset);
+    addStudioPlaque(seat.x,seat.z-3.0,spec);
+  }
+  studioSpecs.forEach((spec,index)=>{
+    const seat=deskSeats[index];
+    if(seat)addStudioEquipment(seat,spec,index);
+  });
   // Each employee receives one permanent workstation, in the same order as the employee roster.
   // A worker always returns to this assigned chair instead of choosing a random desk.
   employeeObjects.forEach((person,index)=>{
