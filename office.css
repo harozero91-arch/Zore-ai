@@ -215,3 +215,18 @@
     white-space: normal;
   }
 }
+
+
+/* Live server clock in the executive office header. */
+.zore-office__top-right{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap}
+.zore-office__clock{display:grid;gap:2px;min-width:145px;padding:7px 12px;border:1px solid rgba(219,190,137,.65);border-radius:10px;background:rgba(255,255,255,.08);text-align:right}
+.zore-office__clock strong{font-family:ui-monospace,SFMono-Regular,monospace;font-size:23px;line-height:1.1;letter-spacing:.06em;color:#fff4d9;font-variant-numeric:tabular-nums}
+.zore-office__clock span{font-size:10px;color:#ead9bb;text-transform:capitalize}
+.zore-office__clock small{font-size:8px;letter-spacing:.1em;color:#b9d9b6}
+.zore-office__actions{align-items:center}
+@media(max-width:700px){
+ .zore-office__top-right{width:100%;justify-content:space-between;gap:9px}
+ .zore-office__clock{text-align:left;min-width:130px;padding:6px 9px}
+ .zore-office__clock strong{font-size:21px}
+ .zore-office__actions{justify-content:flex-end}
+}
