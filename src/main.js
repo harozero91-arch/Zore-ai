@@ -54,8 +54,8 @@ function renderWorkspace(){
   document.querySelector("#profile-panel").addEventListener("click",()=>{});
   document.querySelector("#task-form").addEventListener("submit",assignTask);
   document.querySelector("#refresh-work").addEventListener("click",()=>syncOffice(true));
-  app.removeEventListener("click",handleWorkListClick);
-  app.addEventListener("click",handleWorkListClick);
+  document.removeEventListener("click",handleWorkListClick,true);
+  document.addEventListener("click",handleWorkListClick,true);
 }
 function selectEmployee(id){selectedEmployee=EMPLOYEE_PROFILES.find(e=>e.id===id)||EMPLOYEE_PROFILES[0];const panel=document.querySelector("#profile-panel");if(panel)panel.innerHTML=renderProfile(selectedEmployee);}
 async function syncOffice(redraw=false){
@@ -96,63 +96,82 @@ async function assignTask(event){
   await syncOffice(true);showNotice("Tugas berhasil masuk antrean. Pantau tahap kerja dan hasil AI di bawah.","success");
 }
 async function handleWorkListClick(event){
-  const deleteButton=event.target.closest("[data-delete-task]");
-  if(deleteButton){
-    const taskId=deleteButton.dataset.deleteTask;
-    const taskCardElement=deleteButton.closest(".work-card");
-    const title=taskCardElement?.querySelector("h3")?.textContent?.trim()||"tugas ini";
-    if(!taskId){showNotice("ID tugas tidak terbaca. Muat ulang halaman lalu coba lagi.","error");return;}
-    if(!confirm(`Hapus tugas "${title}" dari daftar? Tindakan ini tidak dapat dibatalkan.`))return;
-    deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
-    let deletion;
-    try{
-      deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);
-    }catch(err){
-      deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
-      showNotice("Tugas belum terhapus: "+(err?.message||"Koneksi database gagal."),"error");return;
-    }
-    const {error,count}=deletion||{};
-    if(error||count===0||count==null){
-      deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
-      showNotice("Tugas belum dapat dipastikan terhapus: "+(error?.message||"Database tidak mengonfirmasi penghapusan. Periksa izin CEO dan kebijakan Supabase."),"error");return;
-    }
-    // Hanya ubah tampilan setelah database mengonfirmasi penghapusan.
-    officeData.tasks=officeData.tasks.filter(item=>String(item.id)!==String(taskId));
-    officeData.reports=officeData.reports.filter(item=>String(item.task_id)!==String(taskId));
-    resultRows=resultRows.filter(item=>String(item.task_id)!==String(taskId));
-    const monitor=document.querySelector(".work-monitor");
-    if(monitor){
-      const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
-      const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
-      updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
-      updated.querySelector(".work-list")?.addEventListener("click",handleWorkListClick);
-    }
-    showNotice("Tugas berhasil dihapus dan langsung dihilangkan dari layar.","success");
+  const target=event.target instanceof Element?event.target:null;
+  if(!target)return;
+  const cancelButton=target.closest("[data-cancel-delete]");
+  if(cancelButton){cancelButton.closest(".delete-confirmation")?.remove();return;}
+  const confirmButton=target.closest("[data-confirm-delete]");
+  if(confirmButton){
+    const taskId=confirmButton.dataset.confirmDelete;
+    const card=confirmButton.closest(".work-card");
+    const deleteButton=card?.querySelector("[data-delete-task]");
+    if(!taskId||!deleteButton){showNotice("Data tugas tidak ditemukan. Muat ulang halaman.","error");return;}
+    await performTaskDeletion(taskId,deleteButton);
     return;
   }
-  const copyButton=event.target.closest("[data-copy-text]");
+  const deleteButton=target.closest("[data-delete-task]");
+  if(deleteButton){
+    const card=deleteButton.closest(".work-card");
+    const taskId=deleteButton.dataset.deleteTask;
+    const title=card?.querySelector("h3")?.textContent?.trim()||"tugas ini";
+    if(!taskId){showNotice("ID tugas tidak terbaca. Muat ulang halaman lalu coba lagi.","error");return;}
+    if(card.querySelector(".delete-confirmation"))return;
+    const confirmation=document.createElement("div");
+    confirmation.className="delete-confirmation";
+    confirmation.style.cssText="margin-top:12px;padding:14px;border:1px solid #d97706;border-radius:10px;background:rgba(217,119,6,.10);display:flex;flex-wrap:wrap;align-items:center;gap:10px";
+    const message=document.createElement("span");
+    message.textContent='Yakin ingin menghapus "'+title+'"? Tindakan ini tidak dapat dibatalkan.';
+    message.style.cssText="flex:1 1 100%;font-weight:600";
+    const yes=document.createElement("button");
+    yes.type="button";yes.textContent="Ya, hapus permanen";yes.dataset.confirmDelete=taskId;
+    yes.style.cssText="padding:10px 14px;border:0;border-radius:8px;background:#b91c1c;color:white;font-weight:700";
+    const no=document.createElement("button");
+    no.type="button";no.textContent="Batal";no.dataset.cancelDelete="true";
+    no.style.cssText="padding:10px 14px;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit";
+    confirmation.append(message,yes,no);
+    deleteButton.insertAdjacentElement("afterend",confirmation);
+    return;
+  }
+  const copyButton=target.closest("[data-copy-text]");
   if(copyButton){
     const text=decodeURIComponent(copyButton.dataset.copyText||"");
     try{
-      if(navigator.clipboard?.writeText){
-        await navigator.clipboard.writeText(text);
-      }else{
-        const area=document.createElement("textarea");
-        area.value=text;area.style.position="fixed";area.style.opacity="0";
-        document.body.appendChild(area);area.select();
-        const copied=document.execCommand("copy");area.remove();
+      if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(text);}
+      else{
+        const area=document.createElement("textarea");area.value=text;area.style.position="fixed";area.style.opacity="0";
+        document.body.appendChild(area);area.select();const copied=document.execCommand("copy");area.remove();
         if(!copied)throw new Error("Clipboard tidak tersedia");
       }
-      const original=copyButton.textContent;
-      copyButton.textContent="Tersalin!";
-      copyButton.disabled=true;
+      const original=copyButton.textContent;copyButton.textContent="Tersalin!";copyButton.disabled=true;
       setTimeout(()=>{copyButton.textContent=original;copyButton.disabled=false;},1400);
-    }catch(error){
-      showNotice("Tidak dapat menyalin otomatis. Tekan lama teks laporan untuk menyalinnya.","error");
-    }
+    }catch(error){showNotice("Tidak dapat menyalin otomatis. Tekan lama teks laporan untuk menyalinnya.","error");}
     return;
   }
   await handleReview(event);
+}
+async function performTaskDeletion(taskId,deleteButton){
+  deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
+  let deletion;
+  try{deletion=await supabase.from("office_tasks").delete({count:"exact"}).eq("id",taskId);}
+  catch(err){
+    deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
+    showNotice("Tugas belum terhapus: "+(err?.message||"Koneksi database gagal."),"error");return;
+  }
+  const {error,count}=deletion||{};
+  if(error||count===0||count==null){
+    deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";
+    showNotice("Tugas belum dapat dipastikan terhapus: "+(error?.message||"Database tidak mengonfirmasi penghapusan. Periksa izin CEO dan kebijakan Supabase."),"error");return;
+  }
+  officeData.tasks=officeData.tasks.filter(item=>String(item.id)!==String(taskId));
+  officeData.reports=officeData.reports.filter(item=>String(item.task_id)!==String(taskId));
+  resultRows=resultRows.filter(item=>String(item.task_id)!==String(taskId));
+  const monitor=document.querySelector(".work-monitor");
+  if(monitor){
+    const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
+    const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
+    updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
+  }
+  showNotice("Tugas berhasil dihapus dan langsung dihilangkan dari layar.","success");
 }
 async function handleReview(event){
   const approve=event.target.closest("[data-approve]"),revise=event.target.closest("[data-revise]");if(!approve&&!revise)return;
