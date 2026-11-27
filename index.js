@@ -384,14 +384,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
     ctx.fillStyle = "rgba(255,249,232,0.97)";
     ctx.strokeStyle = "#c7a56a"; ctx.lineWidth = 7;
     ctx.beginPath(); ctx.roundRect(8, 8, 496, 108, 25); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#35251b"; ctx.font = "bold 27px Arial";
+    ctx.fillStyle = "#35251b"; ctx.font = "bold 30px Arial";
     let text = message;
     while (ctx.measureText(text).width > 450 && text.length > 8) text = text.slice(0, -2) + "…";
     ctx.fillText(text, 28, 72);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
-    sprite.scale.set(7.0, 1.75, 1); sprite.position.y = 3.65;
+    sprite.scale.set(8.2, 2.05, 1); sprite.position.y = 3.75;
     sprite.userData.texture = texture;
     return sprite;
   };
@@ -655,14 +655,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const baseAzimuth = spherical.theta;
   const basePolar = spherical.phi;
   // Slightly wider default framing, a little more camera orbit range and sensitivity.
-  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.12 };
+  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.38 };
   const limits = {
     minTheta: baseAzimuth - THREE.MathUtils.degToRad(45),
     maxTheta: baseAzimuth + THREE.MathUtils.degToRad(45),
     minPhi: Math.max(THREE.MathUtils.degToRad(26), basePolar - THREE.MathUtils.degToRad(14)),
     maxPhi: Math.min(THREE.MathUtils.degToRad(74), basePolar + THREE.MathUtils.degToRad(14)),
     minRadius: spherical.radius * 0.82,
-    maxRadius: spherical.radius * 1.45
+    maxRadius: spherical.radius * 2.05
   };
   const touchSurface = renderer.domElement;
   const pointers = new Map();
