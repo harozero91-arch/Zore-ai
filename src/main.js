@@ -3,6 +3,7 @@ import "../office.css";
 import { mountZoreVirtualOffice } from "../index.js";
 import { supabase } from "./supabase.js";
 import { EMPLOYEE_PROFILES, ORG_DEPARTMENTS, getCharacterState, getCollaborators } from "./employee-character-system.js";
+import { buildEmployeeTaskBrief } from "./ai-agent-policy.js";
 
 const app=document.querySelector("#app");
 const OWNER_EMAIL="rendareza83@gmail.com";
@@ -84,7 +85,10 @@ async function assignTask(event){
   event.preventDefault();const button=event.currentTarget.querySelector("button[type=submit]");const msg=document.querySelector("#task-message");
   const title=document.querySelector("#task-title").value.trim(),instructions=document.querySelector("#task-instructions").value.trim(),idx=Number(document.querySelector("#task-employee").value);
   if(!title)return;button.disabled=true;button.textContent="Mengirim pekerjaan…";msg.textContent="";
-  const {data,error}=await supabase.rpc("office_assign_task",{p_idx:idx,p_title:title,p_instr:instructions});
+  const employee=employeeByIdx(idx);
+  let agentBrief;
+  try{agentBrief=buildEmployeeTaskBrief(employee,title,instructions);}catch(error){button.disabled=false;button.textContent="Kirim ke sistem kerja AI";msg.textContent="Profil agen tidak ditemukan: "+error.message;return;}
+  const {data,error}=await supabase.rpc("office_assign_task",{p_idx:idx,p_title:title,p_instr:agentBrief});
   button.disabled=false;button.textContent="Kirim ke sistem kerja AI";
   if(error){msg.textContent="Pekerjaan gagal dikirim: "+error.message;return;}
   msg.textContent="Pekerjaan masuk antrean server. Worker AI akan mengambilnya otomatis.";
