@@ -20,11 +20,16 @@ export function mountZoreVirtualOffice(host, options = {}) {
   host.innerHTML = `
     <div class="zore-office__top">
       <div><div class="zore-office__eyebrow">ZORE AI · EXECUTIVE CAMPUS</div><strong>Kantor Virtual 3D</strong></div>
-      <div class="zore-office__actions">
-        <button type="button" data-action="day">☀ Siang</button>
-        <button type="button" data-action="night">☾ Malam</button>
-        <button type="button" data-action="sound" aria-pressed="false">♫ Suara: Off</button>
-        <button type="button" data-action="meeting">▣ Mulai rapat</button>
+      <div class="zore-office__top-right">
+        <div class="zore-office__clock" aria-live="polite">
+          <strong data-server-clock>--:--:--</strong>
+          <span data-server-date>Memuat waktu server…</span>
+          <small data-server-status>MENYINKRONKAN SERVER</small>
+        </div>
+        <div class="zore-office__actions">
+          <button type="button" data-action="sound" aria-pressed="false">♫ Suara: Off</button>
+          <button type="button" data-action="meeting">▣ Mulai rapat</button>
+        </div>
       </div>
     </div>
     <div class="zore-office__layout zore-office__layout--single">
@@ -33,7 +38,6 @@ export function mountZoreVirtualOffice(host, options = {}) {
         <div class="zore-office__room-label" aria-live="polite">Kantor Terpadu · Semua Divisi</div>
         <div class="zore-office__social-status">● Karyawan aktif · berjalan & berinteraksi otomatis</div>
         <div class="zore-office__touch-hint">Geser satu jari untuk melihat sisi · cubit dua jari untuk zoom</div>
-        <label class="zore-office__light">Intensitas cahaya <input data-light type="range" min="0.35" max="2.2" step="0.05" value="1.25"></label>
         <div class="zore-office__help">Tampilan tetap · satu area kantor terbuka</div>
       </div>
     </div>
@@ -712,14 +716,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     if (obj) options.onEmployeeSelect?.(obj.userData.employee);
   });
 
-  host.querySelector('[data-action="day"]').addEventListener("click", () => {
-    scene.background.set(0xd8d0c1); scene.fog.color.set(0xd8d0c1);
-    sun.intensity = 2.1; chandelier.intensity = 24;
-  });
-  host.querySelector('[data-action="night"]').addEventListener("click", () => {
-    scene.background.set(0x171d28); scene.fog.color.set(0x171d28);
-    sun.intensity = 0.28; chandelier.intensity = 65;
-  });
+  // Daylight and interior lighting are driven by the synchronized server clock below.
   // Bounded touch orbit + pinch zoom. Camera cannot rotate freely or zoom indefinitely.
   const orbitTarget = new THREE.Vector3(0, 1.5, 0);
   const initialOffset = camera.position.clone().sub(orbitTarget);
@@ -804,11 +801,6 @@ export function mountZoreVirtualOffice(host, options = {}) {
     applyCamera();
   }, { passive: false });
 
-  host.querySelector("[data-light]").addEventListener("input", e => {
-    const value = Number(e.target.value);
-    sun.intensity = value * 1.55; chandelier.intensity = value * 28;
-  });
-
   // Optional ambience: caller may provide an audio URL. No sound starts without user action.
   let audio = null;
   const soundButton = host.querySelector('[data-action="sound"]');
@@ -827,6 +819,65 @@ export function mountZoreVirtualOffice(host, options = {}) {
     camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false);
   };
   const observer = new ResizeObserver(resize); observer.observe(canvasHost); resize();
+  // Synchronize the office clock with the deployment server, then advance it
+  // smoothly using performance.now() between periodic server corrections.
+  const clockNode = host.querySelector("[data-server-clock]");
+  const dateNode = host.querySelector("[data-server-date]");
+  const statusNode = host.querySelector("[data-server-status]");
+  let serverTimeBase = Date.now();
+  let serverPerfBase = performance.now();
+  let serverClockSynced = false;
+  let lastLightingMinute = -1;
+  const getOfficeNow = () => serverTimeBase + (performance.now() - serverPerfBase);
+  const updateClockAndLighting = () => {
+    const nowDate = new Date(getOfficeNow());
+    const timeText = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", second: "2-digit",
+      hour12: false
+    }).format(nowDate);
+    const dateText = new Intl.DateTimeFormat("id-ID", {
+      timeZone: "Asia/Jakarta", weekday: "long", day: "numeric", month: "long", year: "numeric"
+    }).format(nowDate);
+    clockNode.textContent = timeText;
+    dateNode.textContent = dateText + " · WIB";
+    statusNode.textContent = serverClockSynced ? "● WAKTU SERVER TERSINKRON" : "○ MENUNGGU SERVER";
+    const parts = new Intl.DateTimeFormat("en-GB", {
+      timeZone: "Asia/Jakarta", hour: "2-digit", minute: "2-digit", hour12: false
+    }).formatToParts(nowDate);
+    const hour = Number(parts.find(part => part.type === "hour")?.value || 0);
+    const minute = Number(parts.find(part => part.type === "minute")?.value || 0);
+    const minuteKey = hour * 60 + minute;
+    if (minuteKey !== lastLightingMinute) {
+      lastLightingMinute = minuteKey;
+      const daylight = THREE.MathUtils.clamp(Math.sin(((hour + minute / 60) - 6) / 12 * Math.PI), 0, 1);
+      const sky = new THREE.Color(0x171d28).lerp(new THREE.Color(0xd8d0c1), daylight);
+      scene.background.copy(sky);
+      scene.fog.color.copy(sky);
+      sun.intensity = 0.22 + daylight * 1.88;
+      chandelier.intensity = 68 - daylight * 44;
+      sun.position.set(-22 + daylight * 8, 12 + daylight * 23, 18);
+    }
+  };
+  const syncServerClock = async () => {
+    try {
+      const response = await fetch("/api/time", { cache: "no-store", headers: { "Accept": "application/json" } });
+      if (!response.ok) throw new Error("Server time unavailable");
+      const payload = await response.json();
+      if (!Number.isFinite(payload.now)) throw new Error("Invalid server timestamp");
+      serverTimeBase = payload.now;
+      serverPerfBase = performance.now();
+      serverClockSynced = true;
+      updateClockAndLighting();
+    } catch {
+      serverClockSynced = false;
+      updateClockAndLighting();
+    }
+  };
+  updateClockAndLighting();
+  syncServerClock();
+  const clockInterval = setInterval(updateClockAndLighting, 1000);
+  const syncInterval = setInterval(syncServerClock, 60000);
+
   let frame = 0, disposed = false;
   const animate = () => {
     if (disposed) return;
@@ -950,7 +1001,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       console.info("ZORE Office: panggil mount ulang dengan array karyawan terbaru.", nextEmployees?.length || 0);
     },
     destroy() {
-      disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      disposed = true; cancelAnimationFrame(frame); clearInterval(clockInterval); clearInterval(syncInterval); observer.disconnect();
       if (audio) { audio.pause(); audio.src = ""; }
       renderer.dispose();
       host.innerHTML = ""; host.classList.remove("zore-office");
