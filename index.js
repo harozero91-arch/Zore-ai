@@ -600,6 +600,30 @@ export function mountZoreVirtualOffice(host, options = {}) {
       new THREE.MeshBasicMaterial({map:texture,toneMapped:false}));
     plaque.position.set(x,3.0,z);plaque.rotation.y=0;building.add(plaque);
   }
+  function addPrivateStudioShell(seat,spec){
+    const x=seat.x, deskZ=seat.z-1.65;
+    const width=5.05, depth=5.35, backZ=deskZ-2.55, frontZ=deskZ+2.55, sideMat=frameMat;
+    const glass=new THREE.MeshStandardMaterial({color:spec.color,transparent:true,opacity:0.24,roughness:0.2,metalness:0.12});
+    // Three glass walls and a clear front entrance make each workstation read as a private office.
+    const wall=(wx,wz,ww,wd,mat=glass)=>{
+      const panel=box(building,wx,1.72,wz,ww,2.85,wd,mat,false);
+      panel.material=mat;return panel;
+    };
+    wall(x,backZ,width,0.13);
+    wall(x-width/2,deskZ,0.13,depth);
+    wall(x+width/2,deskZ,0.13,depth);
+    // Dark architectural posts and gold top rails make the room boundaries readable.
+    for(const px of [x-width/2,x+width/2]){
+      box(building,px,1.72,backZ,0.16,3.05,0.16,sideMat,false);
+      box(building,px,1.72,frontZ,0.16,3.05,0.16,sideMat,false);
+    }
+    box(building,x,3.18,backZ,width,0.13,0.18,goldMat,false);
+    // A low side panel leaves a visible doorway at the front for employee movement.
+    wall(x-width/2+0.7,frontZ,1.4,0.12,sideMat);
+    wall(x+width/2-0.7,frontZ,1.4,0.12,sideMat);
+    box(building,x,0.31,deskZ,width-0.22,0.06,depth-0.22,material(spec.color,0.72,0.08),false);
+    addStudioPlaque(x,backZ+0.09,spec);
+  }
   function addStudioEquipment(seat,spec,index){
     const x=seat.x,z=seat.z-1.45;
     const accent=material(spec.color,0.38,0.22);
@@ -637,7 +661,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
   }
   studioSpecs.forEach((spec,index)=>{
     const seat=deskSeats[index];
-    if(seat)addStudioEquipment(seat,spec,index);
+    if(seat){
+      addPrivateStudioShell(seat,spec);
+      addStudioEquipment(seat,spec,index);
+    }
   });
   // Each employee receives one permanent workstation, in the same order as the employee roster.
   // A worker always returns to this assigned chair instead of choosing a random desk.
