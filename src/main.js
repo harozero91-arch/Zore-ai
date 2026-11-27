@@ -16,18 +16,16 @@ function showNotice(message,type="info"){
 }
 function renderAuth(message=""){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
-  app.innerHTML=`<main class="auth-shell"><section class="auth-card"><div class="auth-brand">ZORE <span>AI</span></div><p class="eyebrow">WORKFORCE MANAGEMENT</p><h1>Masuk ke kantor ZORE AI</h1><p class="auth-copy">Gunakan akun pemilik yang terhubung dengan data karyawan dan riwayat pekerjaan ZORE AI.</p><form id="auth-form"><label>Email<input id="auth-email" type="email" autocomplete="username" required placeholder="Email akun"></label><label>Kata sandi<input id="auth-password" type="password" autocomplete="current-password" required minlength="6" placeholder="Kata sandi"></label><button class="primary" type="submit">Masuk</button><button class="secondary" id="signup-button" type="button">Buat akun baru</button><p id="auth-message" class="auth-message">${esc(message)}</p></form><p class="auth-foot">Akun baru akan memiliki ruang kerja kosong. Untuk membuka data karyawan dan pekerjaan yang sudah ada, masuk menggunakan akun pemilik lama.</p></section></main>`;
-  document.querySelector("#auth-form").addEventListener("submit",async e=>{
-    e.preventDefault(); const email=document.querySelector("#auth-email").value.trim(); const password=document.querySelector("#auth-password").value;
-    const button=e.currentTarget.querySelector("button[type=submit]"); button.disabled=true; button.textContent="Memeriksa akun…";
-    const {error}=await supabase.auth.signInWithPassword({email,password});
-    if(error){document.querySelector("#auth-message").textContent=error.message;button.disabled=false;button.textContent="Masuk";}
-  });
-  document.querySelector("#signup-button").addEventListener("click",async()=>{
-    const email=document.querySelector("#auth-email").value.trim(); const password=document.querySelector("#auth-password").value;
-    if(!email||password.length<6){document.querySelector("#auth-message").textContent="Isi email dan kata sandi minimal 6 karakter terlebih dahulu.";return;}
-    const {error,data}=await supabase.auth.signUp({email,password,options:{emailRedirectTo:window.location.origin}});
-    document.querySelector("#auth-message").textContent=error?error.message:(data.session?"Akun dibuat. Menyiapkan kantor…":"Akun dibuat. Periksa email untuk konfirmasi, lalu masuk.");
+  app.innerHTML=`<main class="auth-shell"><section class="auth-card"><div class="auth-brand">ZORE <span>AI</span></div><p class="eyebrow">WORKFORCE MANAGEMENT</p><h1>Masuk ke kantor ZORE AI</h1><p class="auth-copy">Masuk menggunakan akun Google pemilik yang sudah ditetapkan untuk ZORE AI. Jangan membuat akun baru dengan email lain karena data perusahaan hanya dapat dibuka oleh anggota yang berwenang.</p><div class="auth-actions"><button class="primary" id="google-login" type="button">Masuk dengan Google</button></div><p id="auth-message" class="auth-message" role="status" aria-live="polite">${esc(message)}</p><p class="auth-foot">Akses kantor dan data karyawan diperiksa oleh server. Akun Google yang belum diberi peran CEO/anggota tidak akan memperoleh akses. Sembilan profil karyawan dan data pekerjaan tidak dibuat ulang oleh halaman login ini.</p></section></main>`;
+  document.querySelector("#google-login").addEventListener("click",async()=>{
+    const button=document.querySelector("#google-login");
+    const message=document.querySelector("#auth-message");
+    button.disabled=true;button.textContent="Menghubungkan ke Google…";message.textContent="";
+    const {error}=await supabase.auth.signInWithOAuth({
+      provider:"google",
+      options:{redirectTo:window.location.origin}
+    });
+    if(error){message.textContent="Login Google gagal: "+error.message;button.disabled=false;button.textContent="Masuk dengan Google";}
   });
 }
 function renderOrganization(){
