@@ -439,14 +439,15 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const spherical = new THREE.Spherical().setFromVector3(initialOffset);
   const baseAzimuth = spherical.theta;
   const basePolar = spherical.phi;
-  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius };
+  // Slightly wider default framing, a little more camera orbit range and sensitivity.
+  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.12 };
   const limits = {
-    minTheta: baseAzimuth - THREE.MathUtils.degToRad(38),
-    maxTheta: baseAzimuth + THREE.MathUtils.degToRad(38),
-    minPhi: Math.max(THREE.MathUtils.degToRad(28), basePolar - THREE.MathUtils.degToRad(12)),
-    maxPhi: Math.min(THREE.MathUtils.degToRad(72), basePolar + THREE.MathUtils.degToRad(12)),
+    minTheta: baseAzimuth - THREE.MathUtils.degToRad(45),
+    maxTheta: baseAzimuth + THREE.MathUtils.degToRad(45),
+    minPhi: Math.max(THREE.MathUtils.degToRad(26), basePolar - THREE.MathUtils.degToRad(14)),
+    maxPhi: Math.min(THREE.MathUtils.degToRad(74), basePolar + THREE.MathUtils.degToRad(14)),
     minRadius: spherical.radius * 0.82,
-    maxRadius: spherical.radius * 1.28
+    maxRadius: spherical.radius * 1.45
   };
   const touchSurface = renderer.domElement;
   const pointers = new Map();
@@ -493,8 +494,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
     }
     const dx = event.clientX - previous.x;
     const dy = event.clientY - previous.y;
-    orbit.theta = THREE.MathUtils.clamp(orbit.theta - dx * 0.005, limits.minTheta, limits.maxTheta);
-    orbit.phi = THREE.MathUtils.clamp(orbit.phi + dy * 0.0035, limits.minPhi, limits.maxPhi);
+    orbit.theta = THREE.MathUtils.clamp(orbit.theta - dx * 0.0058, limits.minTheta, limits.maxTheta);
+    orbit.phi = THREE.MathUtils.clamp(orbit.phi + dy * 0.004, limits.minPhi, limits.maxPhi);
     applyCamera();
   });
   const stopPointer = event => {
