@@ -42,7 +42,7 @@ function taskCard(task){
   const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
   const results=resultRows.filter(r=>r.task_id===task.id).sort((a,b)=>b.version-a.version);
   const report=officeData.reports.find(r=>r.task_id===task.id&&r.kind==="final");
-  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${results.length?'<details class="result-details"><summary>Lihat hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${report?'<div class="manager-report-wrap"><p class="manager-report"><strong>Laporan:</strong> '+esc(report.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(report.body)+'">Salin laporan</button></div>':""}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}</article>`;
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${results.length?'<details class="result-details"><summary>Lihat hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${report?'<div class="manager-report-wrap"><p class="manager-report"><strong>Laporan:</strong> '+esc(report.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(report.body)+'">Salin laporan</button></div>':""}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="'+esc(task.id)+'" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
@@ -96,6 +96,20 @@ async function assignTask(event){
   await syncOffice(true);showNotice("Tugas berhasil masuk antrean. Pantau tahap kerja dan hasil AI di bawah.","success");
 }
 async function handleWorkListClick(event){
+  const deleteButton=event.target.closest("[data-delete-task]");
+  if(deleteButton){
+    const taskId=deleteButton.dataset.deleteTask;
+    const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
+    if(!task)return;
+    const title=task.title||"tugas ini";
+    if(!confirm(`Hapus tugas "${title}" dari daftar? Tindakan ini tidak dapat dibatalkan.`))return;
+    deleteButton.disabled=true;deleteButton.textContent="Menghapus…";
+    const {error}=await supabase.from("office_tasks").delete().eq("id",taskId);
+    if(error){deleteButton.disabled=false;deleteButton.textContent="Hapus tugas";showNotice("Tugas belum terhapus: "+error.message,"error");return;}
+    await syncOffice(true);
+    showNotice("Tugas berhasil dihapus dari daftar.","success");
+    return;
+  }
   const copyButton=event.target.closest("[data-copy-text]");
   if(copyButton){
     const text=decodeURIComponent(copyButton.dataset.copyText||"");
