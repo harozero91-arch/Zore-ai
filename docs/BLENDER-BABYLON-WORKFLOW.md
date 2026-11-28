@@ -21,3 +21,19 @@ Notebook cloud tersedia di [Google Colab — ZORE AI Blender Worker](https://col
 5. Periksa dua file: `zore-cloud-test.blend` dan `zore-cloud-test.glb`.
 
 **Batasan penting:** Colab gratis menyediakan sesi komputasi sementara, bukan server 24 jam. Notebook ini membuktikan Blender dapat dijalankan di cloud dan mengekspor aset; notebook ini belum mengambil antrean tugas karyawan, belum mengirim status otomatis ke ZORE AI, dan belum mengunggah hasil langsung ke Supabase. Jangan menaruh service-role key atau kredensial rahasia di notebook. Integrasi antrean otomatis adalah tahap lanjutan setelah jalur ekspor dasar diuji.
+
+
+## Model kantor eksekutif 3D ZORE AI
+
+Notebook cloud kini membuat model kantor eksekutif yang lebih lengkap, bukan kubus uji:
+- lantai marmer, dinding panel walnut dengan lis brass, jendela dan cornice;
+- meja direktur, monitor, kursi eksekutif, meja rapat dan kursi yang menghadap meja;
+- workstation, partisi, tanaman dekoratif, serta figur karyawan 3D sederhana.
+
+Setelah menjalankan notebook sampai tulisan **SELESAI**, ambil file:
+- `zore-ai-executive-office.blend`
+- `zore-ai-executive-office.glb`
+
+Buka [halaman preview Babylon ZORE AI](https://zore-ai-web.vercel.app/babylon-preview.html), tekan **Muat model Blender**, lalu pilih file GLB tersebut dari perangkat. Tombol **Kembalikan kantor** akan memulihkan tampilan prosedural bawaan.
+
+Catatan: notebook menghasilkan aset 3D statis untuk tahap desain dan pemeriksaan. Figur karyawan belum memiliki rig/siklus animasi, dan aset belum dipasang otomatis ke kantor utama Three.js. Perlu validasi tampilan GLB di Android sebelum migrasi atau integrasi produksi.
