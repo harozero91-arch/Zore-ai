@@ -477,13 +477,29 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 4, 10), bodyMat);
     body.position.y = 0.92; body.castShadow = true; group.add(body);
     const visual = employee.visual || {};
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.29, 24, 18), skinMat);
-    head.scale.set(1.02, visual.headScale || 1.16, 0.94);
+    const faceGeometry = new THREE.SphereGeometry(0.29, 32, 24);
+    const faceShapes = {
+      oval:[0.96,1.16,0.91], "soft-oval":[1.02,1.13,0.94], angular:[0.98,1.12,0.91],
+      heart:[1.02,1.12,0.92], square:[1.08,1.08,0.94], round:[1.08,1.08,1.0], athletic:[1.0,1.13,0.92]
+    };
+    const head = new THREE.Mesh(faceGeometry, skinMat);
+    head.scale.set(...(faceShapes[visual.face] || faceShapes.oval));
+    head.scale.y *= (visual.headScale || 1.08);
     head.position.y = 1.65; head.castShadow = true; group.add(head);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(0.105,0.13,0.22,16), skinMat);
+    neck.position.set(0,1.34,0.015); neck.castShadow=true; group.add(neck);
+    const earParts = [];
+    for (const side of [-1,1]) {
+      const ear = new THREE.Mesh(new THREE.SphereGeometry(0.075,16,12), skinMat);
+      ear.scale.set(0.55,0.9,0.55); ear.position.set(side*0.275,1.62,0.015);
+      group.add(ear); earParts.push(ear);
+      const innerEar = new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8), material(0xb97868,0.82));
+      innerEar.scale.set(0.5,0.9,0.4); innerEar.position.set(side*0.292,1.62,0.045); group.add(innerEar);
+    }
     const hairPalette = [0x29201c,0x30251f,0x211b19,0x3b2922,0x251d1b,0x3a2a22,0x29221e,0x2a2025,0x252329];
-    const hairMat = material(hairPalette[i] || 0x29201c, 0.82);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.292, 20, 14, 0, Math.PI*2, 0, Math.PI*0.58), hairMat);
-    hair.position.y = 1.76; hair.scale.set(1.02,1.0,1.02); group.add(hair);
+    const hairMat = material(hairPalette[i] || 0x29201c, 0.76);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.292, 28, 20, 0, Math.PI*2, 0, Math.PI*0.61), hairMat);
+    hair.position.y = 1.76; hair.scale.set(1.04,1.02,1.02); hair.castShadow=true; group.add(hair);
     // Distinct, repeatable hairstyles and silhouettes for each named employee.
     const hairStyle = visual.hair || "classic";
     if (["low-bun","long-ponytail"].includes(hairStyle)) {
@@ -516,21 +532,34 @@ export function mountZoreVirtualOffice(host, options = {}) {
       fringe.scale.set(1.0,0.5,0.55); fringe.position.set(0,1.84,0.205); group.add(fringe);
     }
     // Expressive eyes, brows, nose and a subtle smile make the face readable at office scale.
-    const eyeWhite = material(0xfff7e9,0.34);
-    const eyeMat = material(0x241b17);
+    const eyeWhite = material(0xfff8ed,0.28);
+    const eyeMat = material([0x38261d,0x30251e,0x463329,0x263b45][i%4],0.3);
     const browMat = hairMat;
+    const eyes = [], eyelids = [];
     for (const x of [-0.112, 0.112]) {
-      const white = new THREE.Mesh(new THREE.SphereGeometry(0.052,12,10),eyeWhite);
-      white.position.set(x,1.67,0.255); group.add(white);
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.027,10,8),eyeMat);
-      eye.position.set(x,1.67,0.299); group.add(eye);
-      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.095,0.018,0.025),browMat);
-      brow.position.set(x,1.755,0.25); brow.rotation.z=x<0?0.08:-0.08; group.add(brow);
+      const eyeGroup = new THREE.Group(); eyeGroup.position.set(x,1.67,0.252); group.add(eyeGroup);
+      const white = new THREE.Mesh(new THREE.SphereGeometry(0.054,16,12),eyeWhite);
+      white.scale.set(1.08,0.78,0.62); eyeGroup.add(white);
+      const iris = new THREE.Mesh(new THREE.SphereGeometry(0.029,14,10),eyeMat);
+      iris.position.set(0,0,0.039); eyeGroup.add(iris);
+      const pupil = new THREE.Mesh(new THREE.SphereGeometry(0.014,10,8),material(0x171311,0.22));
+      pupil.position.set(0,0,0.062); eyeGroup.add(pupil);
+      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.009,8,6),material(0xffffff,0.15));
+      glint.position.set(-0.009,0.012,0.074); eyeGroup.add(glint);
+      const lid = new THREE.Mesh(new THREE.SphereGeometry(0.057,14,10),skinMat);
+      lid.scale.set(1.1,0.02,0.66); lid.position.set(x,1.67,0.263); group.add(lid);
+      const brow = new THREE.Mesh(new THREE.CapsuleGeometry(0.012,0.075,3,8),browMat);
+      brow.position.set(x,1.755,0.25); brow.rotation.z=x<0?0.10:-0.10; group.add(brow);
+      eyes.push(eyeGroup); eyelids.push(lid);
     }
-    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8),skinMat);
-    nose.scale.set(0.7,0.75,0.7);nose.position.set(0,1.59,0.285);group.add(nose);
-    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.052,0.009,6,14,Math.PI),material(0x8f5149));
-    mouth.position.set(0,1.535,0.274);mouth.rotation.z=Math.PI;group.add(mouth);
+    const noseBridge = new THREE.Mesh(new THREE.CapsuleGeometry(0.018,0.075,3,8),skinMat);
+    noseBridge.position.set(0,1.61,0.282); noseBridge.rotation.x=Math.PI/2; group.add(noseBridge);
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.037,14,10),skinMat);
+    nose.scale.set(0.82,0.72,0.72); nose.position.set(0,1.575,0.307); group.add(nose);
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.05,0.009,8,20,Math.PI),material(0x9b5b55,0.55));
+    mouth.position.set(0,1.525,0.282); mouth.rotation.z=Math.PI; group.add(mouth);
+    const lowerLip = new THREE.Mesh(new THREE.SphereGeometry(0.025,12,8),material(0xb87570,0.55));
+    lowerLip.scale.set(1.2,0.32,0.35); lowerLip.position.set(0,1.505,0.279); group.add(lowerLip);
     // Tailored clothing layers, lapels and a role-specific uniform silhouette.
     const shirtMat = material(0xf1e9d8,0.72);
     if (["navy-suit","navy-blazer","plum-professional"].includes(visual.wardrobe)) {
@@ -588,15 +617,20 @@ export function mountZoreVirtualOffice(host, options = {}) {
     }
     const badge = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.16,0.025),goldMat);
     badge.position.set(-0.17,1.18,0.32);group.add(badge);
-    for (const x of [-0.105, 0.105]) {
-      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), eyeMat);
-      eye.position.set(x, 1.64, 0.245); group.add(eye);
-    }
-    const arms = [];
+    const arms = [], hands = [], elbows = [];
     for (const side of [-1, 1]) {
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.095, 0.43, 3, 8), skinMat);
-      arm.position.set(side * 0.39, 0.95, 0);
-      arm.rotation.z = side * -0.18; group.add(arm); arms.push(arm);
+      const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.13,14,10),bodyMat);
+      shoulder.position.set(side*0.34,1.18,0); group.add(shoulder);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.082,0.38,5,12),bodyMat);
+      arm.position.set(side*0.39,0.95,0); arm.rotation.z=side*-0.18; group.add(arm); arms.push(arm);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.075,12,8),bodyMat);
+      elbow.position.set(side*0.43,0.69,0.015); group.add(elbow); elbows.push(elbow);
+      const hand = new THREE.Mesh(new THREE.SphereGeometry(0.085,14,10),skinMat);
+      hand.scale.set(0.78,0.72,0.9); hand.position.set(side*0.43,0.55,0.035); group.add(hand); hands.push(hand);
+      for(let finger=0;finger<3;finger++){
+        const digit=new THREE.Mesh(new THREE.CapsuleGeometry(0.018,0.055,3,6),skinMat);
+        digit.position.set(side*0.43+(finger-1)*0.035,0.48,0.07); group.add(digit);
+      }
     }
     const legs = [];
     for (const side of [-1, 1]) {
@@ -614,7 +648,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const nameTag = new THREE.Sprite(new THREE.SpriteMaterial({map:nameTexture, transparent:true, depthTest:false}));
     nameTag.scale.set(2.2, 0.44, 1); nameTag.position.y = 2.48; group.add(nameTag);
     group.userData = {
-      employee, body, head, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
+      employee, body, head, eyes, eyelids, mouth, hands, elbows, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
       speed: 1.25 + (i % 4) * 0.12, phase: i * 0.8, state: "walking",
       bubble: null, bubbleUntil: 0, partner: null, seated: false, seat: null
     };
@@ -1171,6 +1205,15 @@ export function mountZoreVirtualOffice(host, options = {}) {
           }
         }
         if(!data.seated && data.state!=="chatting")o.position.y=0.12+(moving?Math.abs(Math.sin(now*0.009+data.phase))*0.045:Math.sin(now*0.002+data.phase)*0.018);
+        // Natural blinking and subtle eye/head micro-movements keep faces from looking static.
+        const blinkCycle=(now*0.001+data.phase*1.7)%4.8;
+        const blink=blinkCycle>4.52?Math.sin((blinkCycle-4.52)/0.28*Math.PI):0;
+        data.eyelids?.forEach(lid=>{lid.scale.y=0.02+blink*0.74;lid.position.y=1.67-blink*0.012;});
+        data.eyes?.forEach((eye,index)=>{eye.position.y=1.67+Math.sin(now*0.0012+data.phase+index)*0.004;});
+        if(data.head && data.state!=="working"){
+          data.head.rotation.y=Math.sin(now*0.0007+data.phase)*0.055;
+          data.head.rotation.x=Math.sin(now*0.0009+data.phase*1.3)*0.018;
+        }
         if(!data.seated){
           data.legs.forEach((leg,index)=>{leg.rotation.x=moving?Math.sin(now*0.012+data.phase+index*Math.PI)*0.55:0;});
           data.arms.forEach((arm,index)=>{arm.rotation.x=moving?-Math.sin(now*0.012+data.phase+index*Math.PI)*0.38:Math.sin(now*0.002+data.phase)*0.06;});
