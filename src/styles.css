@@ -738,3 +738,6 @@ footer {
 .google-tools-note{margin:16px 0 0;padding-top:13px;border-top:1px solid #ffffff18;font-size:10px}
 @media(max-width:850px){.google-tools-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:560px){.google-tools-panel{padding:15px}.google-tools-grid{grid-template-columns:1fr}.google-tool-card{padding:15px}}
+
+.google-notebook-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px}.google-notebook-actions button{max-width:100%;min-height:42px}.google-notebook-actions .google-tools-note{flex-basis:100%;margin:0}.google-notebook-actions button:disabled{opacity:.6;cursor:wait}
+@media(max-width:560px){.google-notebook-actions{flex-direction:column;align-items:stretch}.google-notebook-actions button{width:100%}}
