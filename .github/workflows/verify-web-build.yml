@@ -12,6 +12,7 @@ on:
       - "index.html"
       - "office.css"
       - "public/**"
+      - "supabase/**"
       - ".github/workflows/**"
 
 jobs:
