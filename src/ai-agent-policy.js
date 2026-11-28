@@ -57,7 +57,7 @@ const TOOL_ASSIST_BY_ROLE = {
   "AI Storyboard Artist": ["Stitch — referensi layout dan komposisi panel; Gemini Notebook — analisis brief."],
   "AI Character Designer": ["Gemini Notebook — telaah character brief; Pomelli — materi promosi/brand bila relevan."],
   "AI Background Artist": ["Gemini Notebook — analisis referensi lokasi dan moodboard."],
-  "AI 2D Animator": ["Blender Cloud Worker — siapkan dan jalankan skrip Python Blender secara otomatis dari tugas karyawan; simpan .blend/.glb/render, verifikasi artefak, dan serahkan tautan hasil. Antigravity hanya bantuan opsional untuk review kode."] ,
+  "AI 2D Animator": ["ZORE 2D Animation Worker — jalankan skrip Python Pillow untuk membuat frame PNG, lalu FFmpeg mengemas MP4, GIF pratinjau, dan storyboard. Blender Grease Pencil dapat dipakai untuk animasi 2D/3D campuran melalui Blender Worker. Krita/OpenToonz adalah aplikasi desktop dan belum dianggap terhubung otomatis."] ,
   "AI 3D Designer": ["Blender Cloud Worker — jalankan skrip Python Blender untuk menghasilkan file .blend/.glb/render."],
   "AI 3D Modeler": ["Blender Cloud Worker — jalankan skrip Python Blender untuk modeling dan ekspor aset."],
   "AI 3D Animator": ["Blender Cloud Worker — jalankan skrip Python Blender untuk rigging, animasi, dan render."],
