@@ -44,6 +44,9 @@ const ROLE_FOCUS = {
   "AI Character Designer": "Fokus pada konsep karakter, siluet, anatomi, proporsi, ekspresi, kostum, material, palet warna, turnaround, dan konsistensi desain.",
   "AI Background Artist": "Fokus pada environment design, perspektif, layout, pencahayaan, atmosfer, palet, world-building, dan konsistensi lokasi.",
   "AI 2D Animator": "Fokus pada animasi 2D/3D, modeling, rigging, timing, motion, creative coding, pipeline teknis, dubbing, voice direction, lip-sync, dan sinkronisasi audio-visual. Nyatakan perangkat lunak/alat yang benar-benar tersedia.",
+  "AI 3D Designer": "Fokus pada modeling 3D, material PBR, UV, lighting, kamera, rendering, optimasi mesh, dan ekspor .blend/.glb. Untuk eksekusi Blender cloud, siapkan skrip Python Blender yang lengkap, simpan seluruh hasil ke folder ZORE_OUTPUT_DIR, lalu minta persetujuan CEO sebelum menjalankan skrip.",
+  "AI 3D Modeler": "Fokus pada modeling 3D, topology, modifier, UV, material, rigging dasar, dan ekspor .blend/.glb. Siapkan skrip Python Blender yang dapat dijalankan ulang dan simpan hasil ke ZORE_OUTPUT_DIR.",
+  "AI 3D Animator": "Fokus pada rigging, armature, keyframe, timing, motion, kamera, lighting, dan rendering animasi. Siapkan skrip Python Blender dan simpan hasil render/video ke ZORE_OUTPUT_DIR."
   "AI Cleanup & Color Artist": "Fokus pada cleanup, line consistency, inking, warna, shading, color grading, continuity, finishing, dan quality control frame-by-frame.",
   "AI Graphic Designer & Video Editor": "Fokus pada desain grafis, identitas visual, layout, tipografi, editing video, motion graphics, compositing, optimasi aset, dan implementasi web bila diminta."
 };
@@ -54,7 +57,10 @@ const TOOL_ASSIST_BY_ROLE = {
   "AI Storyboard Artist": ["Stitch — referensi layout dan komposisi panel; Gemini Notebook — analisis brief."],
   "AI Character Designer": ["Gemini Notebook — telaah character brief; Pomelli — materi promosi/brand bila relevan."],
   "AI Background Artist": ["Gemini Notebook — analisis referensi lokasi dan moodboard."],
-  "AI 2D Animator": ["Antigravity — review/debug kode secara manual di komputer; Stitch — rancangan UI/flow bila diperlukan."],
+  "AI 2D Animator": ["Blender Cloud Worker — jalankan skrip Python Blender yang sudah disetujui; Antigravity — review/debug kode secara manual di komputer."],
+  "AI 3D Designer": ["Blender Cloud Worker — jalankan skrip Python Blender untuk menghasilkan file .blend/.glb/render."],
+  "AI 3D Modeler": ["Blender Cloud Worker — jalankan skrip Python Blender untuk modeling dan ekspor aset."],
+  "AI 3D Animator": ["Blender Cloud Worker — jalankan skrip Python Blender untuk rigging, animasi, dan render."],
   "AI Cleanup & Color Artist": ["Gemini Notebook — telaah panduan warna, continuity, dan catatan QC."],
   "AI Visual Reverse Engineer & Code Specialist": ["Stitch — rancangan UI/prototipe; Antigravity — bantuan coding dan debugging secara manual di komputer."]
 };
