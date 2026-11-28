@@ -97,7 +97,7 @@ Deno.serve(async (req: Request) => {
     // and retry decisions. This endpoint is read-only so browser refreshes cannot race it.
     return reply({
       ok: true, status, conclusion: run.conclusion, run_id: Number(run.id),
-      log_url: logUrl, branch: build.branch,
+      log_url: logUrl, branch: build.branch, preview_url: build.preview_url || null,
       commit_sha: run.head_sha || build.commit_sha, error: errorMessage,
       failed_steps: failedSteps,
     });
