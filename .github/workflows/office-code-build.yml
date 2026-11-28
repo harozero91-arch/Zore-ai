@@ -46,7 +46,7 @@ jobs:
           curl --fail --silent --show-error --location --max-time 60 "$MANIFEST_URL" -o /tmp/zore-manifest.json
           test -s /tmp/zore-manifest.json
           python3 - <<'PY'
-          import json, pathlib, re
+          import json, pathlib, re, base64
           data=json.loads(pathlib.Path('/tmp/zore-manifest.json').read_text())
           files=data.get('files')
           if not isinstance(files,list) or not files or len(files)>30:
@@ -57,7 +57,8 @@ jobs:
           for item in files:
               name=item.get('path')
               content=item.get('content')
-              if not isinstance(name,str) or not isinstance(content,str):
+              encoded=item.get('content_base64')
+              if not isinstance(name,str) or not (isinstance(content,str) or isinstance(encoded,str)):
                   raise SystemExit('Path atau isi file tidak valid.')
               p=pathlib.PurePosixPath(name)
               if p.is_absolute() or '..' in p.parts or not p.parts:
@@ -66,7 +67,7 @@ jobs:
                   raise SystemExit('Path sistem tidak diizinkan: '+name)
               if p.name.lower() in ('.env','.npmrc','.pypirc') or p.name.lower().endswith(('.pem','.key','.p12')):
                   raise SystemExit('Nama file sensitif ditolak: '+name)
-              raw=content.encode('utf-8')
+              raw=base64.b64decode(encoded,validate=True) if isinstance(encoded,str) else content.encode('utf-8')
               if len(raw)>512000: raise SystemExit('Ukuran file melebihi 512 KB: '+name)
               total+=len(raw)
               if total>3000000: raise SystemExit('Total file melebihi 3 MB.')
