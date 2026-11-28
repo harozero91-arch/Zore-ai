@@ -174,7 +174,8 @@ for name,loc,power,size in [("Large softbox key",(-8,-5,12),2600,9),("Warm wall 
     bpy.ops.object.light_add(type="AREA", location=loc);l=bpy.context.object;l.name=name;l.data.energy=power;l.data.shape="DISK";l.data.size=size;l.rotation_euler=(Vector((0,0,2.5))-l.location).to_track_quat("-Z","Y").to_euler()
 # Organize blend settings.
 scene=bpy.context.scene
-scene.render.engine="BLENDER_EEVEE_NEXT"
+# Blender 5.0 runner exposes EEVEE as BLENDER_EEVEE (not BLENDER_EEVEE_NEXT).
+scene.render.engine="BLENDER_EEVEE"
 scene.render.resolution_x=1600;scene.render.resolution_y=1000;scene.render.resolution_percentage=100
 scene.world.color=(.22,.22,.22)
 scene.view_settings.view_transform="AgX"
