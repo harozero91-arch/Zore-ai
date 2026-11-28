@@ -93,9 +93,9 @@ async function syncFinalWorkToNotebook(automatic=false){
     if(!googleNotebookAccessToken)throw new Error("Hubungkan akun Google terlebih dahulu.");
     const finals=officeData.tasks.filter(t=>t.chain_id&&Number(t.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(t.title||"")&&["submitted","approved"].includes(t.status)).sort((a,b)=>new Date(b.completed_at||b.created_at)-new Date(a.completed_at||a.created_at));
     const task=finals[0];
-    if(!task)throw new Error("Belum ada hasil akhir gabungan yang sudah diserahkan. Selesaikan satu alur kerja karyawan terlebih dahulu.");
+    if(!task){if(automatic)return;throw new Error("Belum ada hasil akhir gabungan yang sudah diserahkan. Selesaikan satu alur kerja karyawan terlebih dahulu.");}
     const result=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version))[0];
-    if(!result?.content)throw new Error("Hasil akhir gabungan belum ditemukan di penyimpanan.");
+    if(!result?.content){if(automatic)return;throw new Error("Hasil akhir gabungan belum ditemukan di penyimpanan.");}
     const syncedIds=JSON.parse(localStorage.getItem("zoreNotebookSyncedResultIds")||"[]");
     if(syncedIds.includes(String(result.id))){if(!automatic)showNotice("Hasil gabungan ini sudah tersinkron ke Gemini Notebook.","success");return;}
     const list=await googleNotebookApi("/notebooks");
