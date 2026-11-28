@@ -1,4 +1,5 @@
 name: ZORE AI 2D Animation
+run-name: ZORE AI 2D ${{ inputs.task_name }}
 
 on:
   workflow_dispatch:
@@ -22,10 +23,11 @@ on:
       - main
 
 permissions:
-  contents: read
+  contents: write
   actions: write
 jobs:
   animate:
+    if: github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -48,10 +50,14 @@ jobs:
           if not script.strip() or len(script) > 20000: raise SystemExit('Skrip kosong atau terlalu panjang.')
           pathlib.Path('/tmp/zore_2d_animation.py').write_text(script, encoding='utf-8')
           pathlib.Path('output').mkdir(exist_ok=True)
-          pathlib.Path('task-info.txt').write_text('Tugas: '+os.environ.get('TASK_NAME','')+'\
-Karyawan: '+os.environ.get('EMPLOYEE','')+'\
-Pipeline: Pillow + FFmpeg\
-')
+          import re, json
+          raw_task = os.environ.get('TASK_NAME','')
+          task_id = re.search(r'ZORE_TASK_ID:([0-9a-fA-F-]{36})', raw_task)
+          version = re.search(r'ZORE_VERSION:(\d+)', raw_task)
+          if not task_id or not version: raise SystemExit('Metadata task_id/version tidak ada pada input task_name.')
+          clean_task = re.sub(r'\s*\[ZORE_(?:TASK_ID|VERSION):[^]]+\]', '', raw_task).strip()
+          pathlib.Path('task-meta.json').write_text(json.dumps({'task_id':task_id.group(1),'version':int(version.group(1)),'task_name':clean_task,'employee':os.environ.get('EMPLOYEE','')}), encoding='utf-8')
+          pathlib.Path('task-info.txt').write_text('Tugas: '+clean_task+'\\nKaryawan: '+os.environ.get('EMPLOYEE','')+'\\nPipeline: Pillow + FFmpeg + WAV SFX\\n', encoding='utf-8')
           PY
       - name: Generate animation frames
         env:
@@ -73,7 +79,18 @@ Pipeline: Pillow + FFmpeg\
               if im.size!=(1280,720): im=ImageOps.fit(im,(1280,720))
               im.save(norm/f'frame_{i:06d}.png')
           meta=json.loads((out/'animation.json').read_text()) if (out/'animation.json').exists() else {}; fps=max(1,min(60,int(meta.get('fps',24)))); n=len(frames)
-          subprocess.run(['ffmpeg','-y','-framerate',str(fps),'-i',str(norm/'frame_%06d.png'),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',str(out/'animation.mp4')],check=True)
+          if n < 24: raise SystemExit(f'Animasi terlalu pendek: hanya {n} frame; minimal 24.')
+          required=['character','background','motion','sound_effects']
+          missing=[k for k in required if not str(meta.get(k,'')).strip()]
+          if missing: raise SystemExit('Metadata animasi belum lengkap: '+', '.join(missing))
+          silent=out/'animation-silent.mp4'
+          subprocess.run(['ffmpeg','-y','-framerate',str(fps),'-i',str(norm/'frame_%06d.png'),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',str(silent)],check=True)
+          audio=out/'sound.wav'
+          if not audio.exists() or audio.stat().st_size < 44: raise SystemExit('Skrip wajib menghasilkan sound.wav berisi efek suara nyata.')
+          subprocess.run(['ffmpeg','-y','-i',str(silent),'-i',str(audio),'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-shortest','-movflags','+faststart',str(out/'animation.mp4')],check=True)
+          probe=subprocess.run(['ffprobe','-v','error','-select_streams','a:0','-show_entries','stream=codec_name','-of','default=noprint_wrappers=1:nokey=1',str(out/'animation.mp4')],capture_output=True,text=True)
+          if probe.returncode or not probe.stdout.strip(): raise SystemExit('Audio tidak ditemukan di MP4 final.')
+          audio.unlink(); silent.unlink()
           step=max(1,round(fps/12)); imgs=[Image.open(norm/f'frame_{i:06d}.png').convert('RGB').resize((640,360)) for i in range(0,n,step)]
           imgs[0].save(out/'animation-preview.gif',save_all=True,append_images=imgs[1:],duration=round(1000*step/fps),loop=0,optimize=True)
           thumbs=[]
@@ -88,6 +105,8 @@ Pipeline: Pillow + FFmpeg\
           test -s output/animation.mp4
           test -s output/animation-preview.gif
           test -s output/storyboard.png
+          test -s output/sound.wav
+          test -s task-meta.json
       - name: Upload 2D animation deliverables
         uses: actions/upload-artifact@v4
         with:
@@ -97,7 +116,25 @@ Pipeline: Pillow + FFmpeg\
             output/animation-preview.gif
             output/storyboard.png
             output/animation.json
+            output/sound.wav
             output/frames/*.png
             task-info.txt
           if-no-files-found: error
           retention-days: 7
+
+      - name: Publish preview and exports to task branch
+        run: |
+          set -euo pipefail
+          TASK_ID=$(python3 -c "import json;print(json.load(open('task-meta.json'))['task_id'])")
+          VERSION=$(python3 -c "import json;print(json.load(open('task-meta.json'))['version'])")
+          BRANCH="zore-animation-$TASK_ID-v$VERSION"
+          TARGET="public/work-results/$TASK_ID/v$VERSION"
+          mkdir -p "$TARGET"
+          cp output/animation.mp4 output/animation-preview.gif output/storyboard.png output/sound.wav output/animation.json "$TARGET/"
+          cp task-info.txt "$TARGET/"
+          git config user.name "zore-ai-build[bot]"
+          git config user.email "zore-ai-build[bot]@users.noreply.github.com"
+          git switch -c "$BRANCH"
+          git add "$TARGET"
+          git commit -m "Publish ZORE AI animation $TASK_ID v$VERSION"
+          git push origin "HEAD:refs/heads/$BRANCH"
