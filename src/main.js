@@ -58,10 +58,13 @@ function renderTeamReport(task){
   if(!task.chain_id||Number(task.stage_order||0)!==0)return "";
   const stages=officeData.tasks.filter(t=>t.chain_id===task.chain_id).sort((a,b)=>Number(a.stage_order||0)-Number(b.stage_order||0));
   if(!stages.length)return "";
-  return `<details class="team-report-details" open><summary>Laporan lengkap seluruh karyawan · ${stages.length} tahap</summary><p class="team-report-intro">Setiap tahap menampilkan penanggung jawab, instruksi, laporan individual, hasil yang benar-benar tersimpan, dan aktivitas yang tercatat. Tahap tanpa data ditandai apa adanya.</p><div class="team-stage-list">${stages.map(renderEmployeeStage).join("")}</div></details>`;
+  const completed=stages.filter(s=>["submitted","approved"].includes(s.status)).length;
+  const running=stages.filter(s=>s.status==="in_progress").length;
+  const failed=stages.filter(s=>s.status==="failed").length;
+  return `<details class="team-report-details" open><summary>Alur kerja & laporan seluruh karyawan · ${stages.length} tahap</summary><div class="team-progress-summary"><strong>${completed}/${stages.length} tahap diserahkan</strong><span>${running} sedang dikerjakan</span><span>${failed} gagal</span></div><p class="team-report-intro">Urutan kerja ditetapkan Manajer Kreatif. Tiap tahap menampilkan penanggung jawab, instruksi khusus, laporan individual, hasil lengkap yang benar-benar tersimpan, file unduhan bila tersedia, dan jejak aktivitas. Tahap berikutnya baru dapat dimulai setelah hasil sebelumnya diserahkan.</p><div class="team-stage-list">${stages.map(renderEmployeeStage).join("")}</div></details>`;
 }
 function taskCard(task){
-  const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
+  const e=task.chain_id&&Number(task.stage_order||0)===0?employeeByIdx(1):employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
   const results=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version));
   const reports=officeData.reports.filter(r=>String(r.task_id)===String(task.id));
   const isFinalMerge=!!task.chain_id&&Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||"")&&["submitted","approved"].includes(status);
