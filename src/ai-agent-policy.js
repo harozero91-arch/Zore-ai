@@ -48,6 +48,17 @@ const ROLE_FOCUS = {
   "AI Graphic Designer & Video Editor": "Fokus pada desain grafis, identitas visual, layout, tipografi, editing video, motion graphics, compositing, optimasi aset, dan implementasi web bila diminta."
 };
 
+const TOOL_ASSIST_BY_ROLE = {
+  "AI Creative Manager": ["Gemini Notebook — telaah dokumen dan sumber yang diberikan; Stitch — referensi UI bila diperlukan."],
+  "AI Scriptwriter": ["Gemini Notebook — analisis bahan riset/dokumen; Pomelli — materi kampanye setelah konsep siap."],
+  "AI Storyboard Artist": ["Stitch — referensi layout dan komposisi panel; Gemini Notebook — analisis brief."],
+  "AI Character Designer": ["Gemini Notebook — telaah character brief; Pomelli — materi promosi/brand bila relevan."],
+  "AI Background Artist": ["Gemini Notebook — analisis referensi lokasi dan moodboard."],
+  "AI 2D Animator": ["Antigravity — review/debug kode secara manual di komputer; Stitch — rancangan UI/flow bila diperlukan."],
+  "AI Cleanup & Color Artist": ["Gemini Notebook — telaah panduan warna, continuity, dan catatan QC."],
+  "AI Graphic Designer & Video Editor": ["Stitch — rancangan UI/prototipe; Antigravity — bantuan coding dan debugging secara manual di komputer."]
+};
+
 export function buildEmployeeTaskBrief(employee, title, instructions) {
   if (!employee) throw new Error("Profil karyawan tidak ditemukan.");
   const focus = ROLE_FOCUS[employee.role] || "Kerjakan sesuai keahlian jabatan dan batas kewenangan yang diberikan.";
@@ -65,6 +76,10 @@ export function buildEmployeeTaskBrief(employee, title, instructions) {
     "",
     "ARAHAN KHUSUS JABATAN:",
     focus,
+    "",
+    "AI TOOL ASSISTANT GRATIS:",
+    ...(TOOL_ASSIST_BY_ROLE[employee.role] || ["Gemini Notebook — analisis dokumen pendukung bila tersedia."]),
+    "Gunakan Gemini bawaan ZORE AI untuk mengerjakan inti tugas. Alat Google eksternal adalah bantuan opsional yang perlu dibuka/dijalankan manual dan hasilnya diimpor bila diperlukan. Jangan mengaku telah memakai tool eksternal jika belum benar-benar dilakukan. Tidak boleh mengaktifkan API berbayar. Opal sudah tidak tersedia; jangan menugaskannya.",
     "",
     "STANDAR KERJA:",
     ...WORK_STANDARD.map((x, i) => (i + 1) + ". " + x),
