@@ -716,3 +716,9 @@ footer {
 .activity-feed p{padding:9px 0;border-bottom:1px solid #ffffff12;color:#d2c1a5;font-size:11px}.activity-feed p span{color:#9c865f;margin-right:8px}.empty-state{padding:20px;border:1px dashed #80643b;border-radius:10px;color:#b7a58b;text-align:center;font-size:13px}.notice{position:fixed;right:16px;bottom:16px;z-index:20;padding:14px 18px;border-radius:10px;background:#263c36;color:#e8f3e9;box-shadow:0 8px 30px #0008}.notice.error{background:#69362d}
 @media(max-width:850px){.org-departments{grid-template-columns:repeat(2,minmax(0,1fr))}.org-person{min-width:150px;padding:12px}}
 @media(max-width:600px){.org-section,.work-monitor,.activity-feed{padding:15px}.org-departments{grid-template-columns:1fr}.org-person{min-width:0;width:min(100%,260px)}.profile-grid{grid-template-columns:1fr}.work-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.task-form-row{grid-template-columns:1fr}.topbar{gap:10px;align-items:flex-start}.top-actions{flex-direction:column;align-items:flex-end}.signed-in{max-width:120px;overflow:hidden;text-overflow:ellipsis}.work-card-head{flex-direction:column}.review-actions{flex-wrap:wrap}}
+
+
+.task-video-actions{display:flex;flex-wrap:wrap;align-items:center;gap:9px;margin-top:14px;padding-top:12px;border-top:1px solid #ffffff18}
+.task-video-actions button{padding:9px 13px;font-size:11px}
+.task-video-actions small{color:#b7a58b;font-size:10px;line-height:1.5}
+.make-task-video:disabled{opacity:.65;cursor:wait}
