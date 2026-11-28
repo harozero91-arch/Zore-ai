@@ -1,7 +1,14 @@
-import {
-  Engine, Scene, Vector3, Color3, Color4, HemisphericLight, DirectionalLight,
-  MeshBuilder, PBRMaterial, ArcRotateCamera, ShadowGenerator, TransformNode
-} from "@babylonjs/core";
+import { Engine } from "@babylonjs/core/Engines/engine";
+import { Scene } from "@babylonjs/core/scene";
+import { Vector3 } from "@babylonjs/core/Maths/math.vector";
+import { Color3, Color4 } from "@babylonjs/core/Maths/math.color";
+import { HemisphericLight } from "@babylonjs/core/Lights/hemisphericLight";
+import { DirectionalLight } from "@babylonjs/core/Lights/directionalLight";
+import { MeshBuilder } from "@babylonjs/core/Meshes/meshBuilder";
+import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
+import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
+import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
+import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
 
 const canvas=document.getElementById("renderCanvas");
 const viewport=document.getElementById("viewport");
