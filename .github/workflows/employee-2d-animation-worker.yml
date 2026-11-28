@@ -1,7 +1,10 @@
-name: ZORE AI Employee 2D Animation Worker
+name: ZORE AI 2D Animation
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - main
     inputs:
       task_name:
         description: "Nama tugas animasi 2D"
@@ -19,7 +22,7 @@ on:
 
 permissions:
   contents: read
-
+  actions: write
 jobs:
   animate:
     runs-on: ubuntu-latest
