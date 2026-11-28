@@ -680,43 +680,48 @@ export function mountZoreVirtualOffice(host, options = {}) {
     "AI Graphic Designer & Video Editor": ["AI Cleanup & Color Artist", "AI Creative Manager"]
   };
   const makeBubble = (message) => {
-    // Render dialogue at high resolution and wrap it into readable lines.
+    // Render at 2K resolution so dialogue stays crisp on mobile and desktop.
     const canvas = document.createElement("canvas");
-    canvas.width = 1024; canvas.height = 320;
+    canvas.width = 2048; canvas.height = 768;
     const ctx = canvas.getContext("2d");
     ctx.imageSmoothingEnabled = true;
-    ctx.fillStyle = "rgba(255,252,242,0.99)";
-    ctx.strokeStyle = "#a98248"; ctx.lineWidth = 10;
-    ctx.beginPath(); ctx.roundRect(12, 12, 1000, 296, 34); ctx.fill(); ctx.stroke();
-    ctx.fillStyle = "#24180f";
-    ctx.font = "bold 48px Arial";
+    ctx.imageSmoothingQuality = "high";
+    ctx.fillStyle = "rgba(255,253,247,0.995)";
+    ctx.strokeStyle = "#98713d"; ctx.lineWidth = 12;
+    ctx.shadowColor = "rgba(20,14,8,0.24)"; ctx.shadowBlur = 18; ctx.shadowOffsetY = 8;
+    ctx.beginPath(); ctx.roundRect(20, 20, 2008, 728, 64); ctx.fill(); ctx.stroke();
+    ctx.shadowColor = "transparent"; ctx.shadowBlur = 0; ctx.shadowOffsetY = 0;
+    ctx.fillStyle = "#21170f";
+    ctx.font = "700 76px Arial, sans-serif";
     ctx.textAlign = "left"; ctx.textBaseline = "middle";
-    const words = String(message || "").trim().split(/\\s+/);
+    const words = String(message || "").trim().split(/\s+/).filter(Boolean);
     const lines = [];
     let line = "";
+    const maxWidth = 1840;
     for (const word of words) {
       const candidate = line ? line + " " + word : word;
-      if (ctx.measureText(candidate).width > 900 && line) {
+      if (ctx.measureText(candidate).width > maxWidth && line) {
         lines.push(line); line = word;
       } else line = candidate;
     }
     if (line) lines.push(line);
-    const visibleLines = lines.slice(0, 3);
-    if (lines.length > 3) {
-      let last = visibleLines[2];
-      while (ctx.measureText(last + "…").width > 880 && last.length) last = last.slice(0, -1);
-      visibleLines[2] = last.trimEnd() + "…";
+    const visibleLines = lines.slice(0, 4);
+    if (lines.length > 4) {
+      let last = visibleLines[3];
+      while (ctx.measureText(last + "…").width > maxWidth && last.length) last = last.slice(0, -1);
+      visibleLines[3] = last.trimEnd() + "…";
     }
-    const lineHeight = 76;
-    const startY = 160 - ((visibleLines.length - 1) * lineHeight) / 2;
-    visibleLines.forEach((text, index) => ctx.fillText(text, 54, startY + index * lineHeight));
+    const lineHeight = 150;
+    const startY = 384 - ((visibleLines.length - 1) * lineHeight) / 2;
+    visibleLines.forEach((text, index) => ctx.fillText(text, 92, startY + index * lineHeight));
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.minFilter = THREE.LinearFilter;
     texture.magFilter = THREE.LinearFilter;
-    texture.generateMipmaps = true;
-    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false}));
-    sprite.scale.set(7.8, 2.44, 1); sprite.position.y = 3.85;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    const sprite = new THREE.Sprite(new THREE.SpriteMaterial({map:texture, transparent:true, depthTest:false, toneMapped:false}));
+    sprite.scale.set(9.6, 3.6, 1); sprite.position.y = 4.25;
     sprite.userData.texture = texture;
     return sprite;
   };
