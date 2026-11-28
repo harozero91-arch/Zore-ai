@@ -113,6 +113,20 @@ Deno.serve(async (req: Request) => {
       storyboard: new URL('storyboard.png', previewBase).toString(),
       audio: new URL('sound.wav', previewBase).toString(),
     } : null;
+    if (mediaExports) {
+      const exports = [
+        { path: 'animation-preview.gif', name: 'Pratinjau animasi GIF', content_type: 'image/gif', url: mediaExports.preview_gif },
+        { path: 'animation.mp4', name: 'Video animasi MP4', content_type: 'video/mp4', url: mediaExports.mp4 },
+        { path: 'storyboard.png', name: 'Storyboard PNG', content_type: 'image/png', url: mediaExports.storyboard },
+        { path: 'sound.wav', name: 'Efek suara WAV', content_type: 'audio/wav', url: mediaExports.audio },
+      ];
+      for (const item of exports) artifacts.push({
+        id: 'generated-' + item.path, path: item.path, name: item.name, content_type: item.content_type,
+        size_bytes: null, sha256: null, download_url: item.url,
+        preview_url: item.content_type === 'image/gif' ? item.url : null,
+      });
+      if (mainFile) (mainFile as any).animation_preview_url = mediaExports.preview_gif;
+    }
     return reply({
       ok: true,
       task_id: taskId, version,
