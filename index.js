@@ -1,4 +1,8 @@
 import * as THREE from "three";
+import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
 
 const OFFICE = { name: "Kantor Terpadu", x: 0, z: 0, w: 42, d: 30 };
 
@@ -8,7 +12,44 @@ const COLORS = {
 };
 
 function material(color, roughness = 0.65, metalness = 0.05) {
-  return new THREE.MeshStandardMaterial({ color, roughness, metalness });
+  return new THREE.MeshStandardMaterial({ color, roughness, metalness, envMapIntensity: 0.85 });
+}
+
+function createSurfaceTexture(kind, baseColor, repeatX = 2, repeatY = 2, maxAnisotropy = 4) {
+  const canvas = document.createElement("canvas");
+  canvas.width = 512; canvas.height = 512;
+  const ctx = canvas.getContext("2d");
+  ctx.fillStyle = baseColor; ctx.fillRect(0, 0, 512, 512);
+  if (kind === "marble") {
+    for (let i = 0; i < 15; i++) {
+      const x = (i * 83 + 29) % 512, y = (i * 137 + 41) % 512;
+      ctx.beginPath(); ctx.moveTo(x - 170, y - 90);
+      ctx.bezierCurveTo(x - 60, y - 150, x + 40, y + 130, x + 180, y + 80);
+      ctx.strokeStyle = i % 3 === 0 ? "rgba(154,126,94,0.24)" : "rgba(255,255,255,0.52)";
+      ctx.lineWidth = i % 4 === 0 ? 3 : 1.4; ctx.stroke();
+    }
+    for (let i = 0; i < 900; i++) {
+      ctx.fillStyle = i % 2 ? "rgba(90,75,60,0.035)" : "rgba(255,255,255,0.06)";
+      ctx.fillRect((i * 97) % 512, (i * 193) % 512, 2, 2);
+    }
+  } else {
+    for (let i = 0; i < 46; i++) {
+      const y = i * 11 + (i % 3) * 2;
+      ctx.beginPath(); ctx.moveTo(0, y);
+      ctx.bezierCurveTo(150, y + Math.sin(i) * 4, 340, y - Math.cos(i) * 5, 512, y + Math.sin(i * 0.7) * 3);
+      ctx.strokeStyle = i % 4 === 0 ? "rgba(55,25,12,0.16)" : "rgba(255,220,170,0.12)";
+      ctx.lineWidth = i % 5 === 0 ? 3 : 1; ctx.stroke();
+    }
+  }
+  const map = new THREE.CanvasTexture(canvas);
+  map.colorSpace = THREE.SRGBColorSpace;
+  map.wrapS = map.wrapT = THREE.RepeatWrapping;
+  map.repeat.set(repeatX, repeatY);
+  map.anisotropy = maxAnisotropy;
+  const bumpMap = map.clone();
+  bumpMap.colorSpace = THREE.NoColorSpace;
+  bumpMap.needsUpdate = true;
+  return { map, bumpMap };
 }
 
 export function mountZoreVirtualOffice(host, options = {}) {
@@ -54,29 +95,74 @@ export function mountZoreVirtualOffice(host, options = {}) {
   camera.position.set(38, 40, 43);
   camera.lookAt(0, 1.5, 0);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+  const isMobile = window.matchMedia?.("(max-width: 760px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const deviceCores = navigator.hardwareConcurrency || 4;
+  const qualityTier = !isMobile && deviceCores >= 8 ? "high" : deviceCores <= 4 ? "low" : "balanced";
+  const renderer = new THREE.WebGLRenderer({
+    antialias: qualityTier !== "low", alpha: false, powerPreference: "high-performance"
+  });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.2 : qualityTier === "high" ? 1.75 : 1.4));
   renderer.shadowMap.enabled = options.shadows !== false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.15;
+  renderer.toneMappingExposure = 1.12;
   canvasHost.appendChild(renderer.domElement);
 
-  scene.add(new THREE.HemisphereLight(0xfff4df, 0x594536, 1.45));
-  const sun = new THREE.DirectionalLight(0xffe4b8, 2.1);
+  const pmremGenerator = new THREE.PMREMGenerator(renderer);
+  const environmentRoom = new RoomEnvironment();
+  const environmentTarget = pmremGenerator.fromScene(environmentRoom, 0.04);
+  scene.environment = environmentTarget.texture;
+  scene.environmentIntensity = qualityTier === "high" ? 0.62 : 0.42;
+  environmentRoom.dispose?.();
+  pmremGenerator.dispose();
+
+  let composer = null;
+  if (qualityTier === "high" && !isMobile) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.13, 0.28, 0.88));
+  }
+
+  scene.add(new THREE.HemisphereLight(0xfff4df, 0x594536, 1.3));
+  scene.add(new THREE.AmbientLight(0xffffff, 0.28));
+  const sun = new THREE.DirectionalLight(0xffe8c9, 2.25);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
-  sun.shadow.mapSize.set(1024, 1024); scene.add(sun);
-  const chandelier = new THREE.PointLight(0xffd99a, 38, 45);
+  const shadowResolution = qualityTier === "high" ? 2048 : 1024;
+  sun.shadow.mapSize.set(shadowResolution, shadowResolution);
+  sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
+  sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
+  sun.shadow.camera.near = 1; sun.shadow.camera.far = 90;
+  sun.shadow.bias = -0.00012; sun.shadow.normalBias = 0.025;
+  sun.shadow.radius = qualityTier === "high" ? 3 : 2;
+  scene.add(sun);
+  const chandelier = new THREE.PointLight(0xffd99a, 34, 45);
   chandelier.position.set(0, 9, 0); scene.add(chandelier);
 
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(48, 36), material(COLORS.marble, 0.24, 0.12));
+  const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), qualityTier === "high" ? 8 : 4);
+  const marbleTexture = createSurfaceTexture("marble", "#e9e3d7", 3, 2, maxAnisotropy);
+  const woodTexture = createSurfaceTexture("wood", "#70452e", 2, 2, maxAnisotropy);
+  const marbleMaterial = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: marbleTexture.map, bumpMap: marbleTexture.bumpMap,
+    bumpScale: 0.018, roughness: 0.28, metalness: 0.035,
+    clearcoat: 0.24, clearcoatRoughness: 0.32, envMapIntensity: 0.9
+  });
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(48, 36), marbleMaterial);
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.16; floor.receiveShadow = true; scene.add(floor);
 
   const building = new THREE.Group(); scene.add(building);
-  const wallMat = material(COLORS.ivory);
-  const woodMat = material(COLORS.mahogany, 0.38);
-  const goldMat = material(COLORS.gold, 0.3, 0.65);
+  const wallMat = new THREE.MeshPhysicalMaterial({
+    color: COLORS.ivory, roughness: 0.82, metalness: 0.015, clearcoat: 0.08, clearcoatRoughness: 0.7
+  });
+  const woodMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: woodTexture.map, bumpMap: woodTexture.bumpMap,
+    bumpScale: 0.026, roughness: 0.39, metalness: 0.025,
+    clearcoat: 0.2, clearcoatRoughness: 0.48, envMapIntensity: 0.85
+  });
+  const goldMat = new THREE.MeshPhysicalMaterial({
+    color: COLORS.gold, roughness: 0.28, metalness: 0.72,
+    clearcoat: 0.32, clearcoatRoughness: 0.24, envMapIntensity: 1.15
+  });
   const darkMat = material(COLORS.dark, 0.5);
   const emeraldMat = material(COLORS.emerald, 0.7);
 
@@ -116,8 +202,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
   box(building, -20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
   box(building, 20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
 
-  const glassMat = new THREE.MeshStandardMaterial({
-    color: 0x9fc5bd, transparent: true, opacity: 0.22, roughness: 0.16, metalness: 0.12
+  const glassMat = new THREE.MeshPhysicalMaterial({
+    color: 0xb9d8d2, transparent: true, opacity: 0.28,
+    roughness: 0.12, metalness: 0.06, transmission: 0.18,
+    thickness: 0.12, ior: 1.46, envMapIntensity: 1.1
   });
   const frameMat = material(0x242c2b, 0.35, 0.55);
   function glassPartition(x, z, length, alongX = true, height = 3.0) {
@@ -310,6 +398,19 @@ export function mountZoreVirtualOffice(host, options = {}) {
   executivePlaque.rotation.y=Math.PI/2; building.add(executivePlaque);
   box(executivePlaque,0,0,0,5.6,2.2,0.16,woodMat,false);
   addDepartmentSign(-20.65,3.1,0.0,"ZERO AI · EXECUTIVE CAMPUS",Math.PI/2,5.0);
+
+  // Panoramic glazing and champagne-metal frames bring natural daylight into the open-plan office.
+  const windowGlass = new THREE.MeshPhysicalMaterial({
+    color: 0xc6e0e4, transparent: true, opacity: 0.34, roughness: 0.1,
+    metalness: 0.04, transmission: 0.24, thickness: 0.08, ior: 1.48, envMapIntensity: 1.2
+  });
+  const windowFrame = material(0x9a794d, 0.27, 0.72);
+  for (const wx of [-5.2, 5.2]) {
+    box(building, wx, 3.65, -14.79, 4.35, 2.15, 0.055, windowGlass, false);
+    for (const dx of [-2.2, 2.2]) box(building, wx + dx, 3.65, -14.73, 0.075, 2.32, 0.12, windowFrame, false);
+    for (const wy of [2.55, 4.75]) box(building, wx, wy, -14.73, 4.45, 0.075, 0.12, windowFrame, false);
+    box(building, wx, 3.65, -14.70, 0.055, 2.1, 0.12, windowFrame, false);
+  }
 
   // Ceiling is intentionally omitted so the complete interior remains visible.
   // Warm architectural lighting.
@@ -1070,6 +1171,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const resize = () => {
     const w = Math.max(1, canvasHost.clientWidth), h = Math.max(1, canvasHost.clientHeight);
     camera.aspect = w/h; camera.updateProjectionMatrix(); renderer.setSize(w,h,false);
+    if (composer) composer.setSize(w,h);
   };
   const observer = new ResizeObserver(resize); observer.observe(canvasHost); resize();
   // Synchronize the office clock with the deployment server, then advance it
@@ -1269,7 +1371,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
         }
       });
     }
-    renderer.render(scene, camera);
+    if (composer) composer.render();
+    else renderer.render(scene, camera);
   };
   animate();
 
@@ -1282,6 +1385,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
       disposed = true; cancelAnimationFrame(frame); clearInterval(clockInterval); clearInterval(syncInterval); observer.disconnect();
       if (audio) { audio.pause(); audio.src = ""; }
       renderer.dispose();
+      composer?.dispose();
+      environmentTarget.dispose();
+      marbleTexture.map.dispose(); marbleTexture.bumpMap.dispose();
+      woodTexture.map.dispose(); woodTexture.bumpMap.dispose();
       host.innerHTML = ""; host.classList.remove("zore-office");
     }
   };
