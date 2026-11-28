@@ -1,0 +1,87 @@
+name: ZORE AI Employee Blender Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_name:
+        description: "Nama tugas karyawan"
+        required: true
+        type: string
+      employee:
+        description: "Nama/jabatan karyawan"
+        required: true
+        default: "AI 3D Designer"
+        type: string
+      blender_script:
+        description: "Kode Python Blender yang sudah dibuat dan diperiksa karyawan (maksimal 20000 karakter)"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zore-blender-worker-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  blender-task:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout task templates
+        uses: actions/checkout@v4
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender python3-numpy
+
+      - name: Prepare employee task
+        env:
+          TASK_NAME: ${{ inputs.task_name }}
+          EMPLOYEE: ${{ inputs.employee }}
+          BLENDER_SCRIPT: ${{ inputs.blender_script }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          script = os.environ.get("BLENDER_SCRIPT", "")
+          if not script.strip():
+              raise SystemExit("Kode Blender kosong.")
+          if len(script) > 20000:
+              raise SystemExit("Kode melebihi batas 20.000 karakter.")
+          pathlib.Path("/tmp/zore_employee_task.py").write_text(script, encoding="utf-8")
+          pathlib.Path("task-info.txt").write_text(
+              "Tugas: " + os.environ.get("TASK_NAME", "") + "\\n" +
+              "Karyawan: " + os.environ.get("EMPLOYEE", "") + "\\n" +
+              "Runner: GitHub Actions ephemeral Ubuntu + Blender\\n",
+              encoding="utf-8"
+          )
+          PY
+
+      - name: Execute Blender employee task
+        run: |
+          mkdir -p output
+          ZORE_OUTPUT_DIR="$GITHUB_WORKSPACE/output" blender --background --python /tmp/zore_employee_task.py
+
+      - name: Validate deliverables
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          out = Path("output")
+          files = [p for p in out.rglob("*") if p.is_file()]
+          if not files:
+              raise SystemExit("Blender selesai tetapi tidak menghasilkan file di folder output/. Simpan hasil tugas ke ZORE_OUTPUT_DIR.")
+          for p in files:
+              print(f"DELIVERABLE {p} {p.stat().st_size} bytes")
+          PY
+
+      - name: Upload employee deliverables
+        uses: actions/upload-artifact@v4
+        with:
+          name: zore-employee-blender-${{ github.run_number }}
+          path: |
+            output/**
+            task-info.txt
+          if-no-files-found: error
+          retention-days: 7
