@@ -117,8 +117,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const renderer = new THREE.WebGLRenderer({
     antialias: qualityTier !== "low", alpha: false, powerPreference: "high-performance"
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.45 : qualityTier === "high" ? 2 : 1.6));
-  renderer.shadowMap.enabled = options.shadows !== false;
+  // Mobile-first quality defaults: render fewer pixels and avoid expensive shadow maps on phones.
+  const initialPixelRatio = Math.min(window.devicePixelRatio || 1,
+    isMobile ? 0.95 : qualityTier === "high" ? 1.5 : qualityTier === "balanced" ? 1.25 : 1.0);
+  renderer.setPixelRatio(initialPixelRatio);
+  const enableShadows = options.shadows !== false && !isMobile && qualityTier !== "low";
+  renderer.shadowMap.enabled = enableShadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -165,7 +169,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const receptionFill = new THREE.PointLight(0xffd9ad, 5, 18, 1.8);
   receptionFill.position.set(-14, 4.2, 10); scene.add(receptionFill);
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
-  const shadowSize = isMobile ? 1024 : shadowResolution === 2048 ? 3072 : 2048;
+  const shadowSize = shadowResolution;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
   sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
   sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
@@ -1427,17 +1431,26 @@ export function mountZoreVirtualOffice(host, options = {}) {
   let qualitySampleStart = performance.now();
   let qualityFrameCount = 0;
   let adaptivePixelRatio = renderer.getPixelRatio();
-  const maxPixelRatio = Math.min(window.devicePixelRatio || 1, isMobile ? 1.35 : qualityTier === "high" ? 1.85 : 1.55);
+  const maxPixelRatio = Math.min(window.devicePixelRatio || 1,
+    isMobile ? 1.0 : qualityTier === "high" ? 1.5 : qualityTier === "balanced" ? 1.25 : 1.0);
+  let lastMobileRender = 0;
   const animate = () => {
     if (disposed) return;
     frame = requestAnimationFrame(animate);
+    if (document.hidden) {
+      frame = requestAnimationFrame(animate);
+      return;
+    }
     const now = performance.now();
+    // Cap phone rendering at 30 FPS to reduce sustained GPU heat and battery use.
+    if (isMobile && now - lastMobileRender < 1000 / 30) return;
+    if (isMobile) lastMobileRender = now;
     if (isMobile) {
       qualityFrameCount++;
       const sampleDuration = now - qualitySampleStart;
       if (sampleDuration >= 3000) {
         const fps = qualityFrameCount * 1000 / sampleDuration;
-        const targetRatio = fps < 38 ? 0.9 : fps < 47 ? 1.0 : fps > 56 ? maxPixelRatio : adaptivePixelRatio;
+        const targetRatio = fps < 22 ? 0.7 : fps < 26 ? 0.8 : fps < 29 ? 0.9 : fps > 31 ? maxPixelRatio : adaptivePixelRatio;
         if (Math.abs(targetRatio - adaptivePixelRatio) > 0.06) {
           adaptivePixelRatio = targetRatio;
           renderer.setPixelRatio(adaptivePixelRatio);
