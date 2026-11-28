@@ -90,6 +90,11 @@ jobs:
           subprocess.run(['ffmpeg','-y','-i',str(silent),'-i',str(audio),'-map','0:v:0','-map','1:a:0','-c:v','copy','-c:a','aac','-shortest','-movflags','+faststart',str(out/'animation.mp4')],check=True)
           probe=subprocess.run(['ffprobe','-v','error','-select_streams','a:0','-show_entries','stream=codec_name','-of','default=noprint_wrappers=1:nokey=1',str(out/'animation.mp4')],capture_output=True,text=True)
           if probe.returncode or not probe.stdout.strip(): raise SystemExit('Audio tidak ditemukan di MP4 final.')
+          volume=subprocess.run(['ffmpeg','-i',str(audio),'-af','volumedetect','-f','null','-'],capture_output=True,text=True)
+          if 'mean_volume: -inf' in (volume.stderr or ''): raise SystemExit('sound.wav kosong/senyap; efek suara harus benar-benar terdengar.')
+          audio_duration=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','default=noprint_wrappers=1:nokey=1',str(audio)],text=True).strip())
+          video_duration=n/fps
+          if audio_duration < video_duration-0.25: raise SystemExit('Durasi audio lebih pendek daripada animasi.')
           audio.unlink(); silent.unlink()
           step=max(1,round(fps/12)); imgs=[Image.open(norm/f'frame_{i:06d}.png').convert('RGB').resize((640,360)) for i in range(0,n,step)]
           imgs[0].save(out/'animation-preview.gif',save_all=True,append_images=imgs[1:],duration=round(1000*step/fps),loop=0,optimize=True)
