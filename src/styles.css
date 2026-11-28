@@ -741,3 +741,21 @@ footer {
 
 .google-notebook-actions{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-top:18px}.google-notebook-actions button{max-width:100%;min-height:42px}.google-notebook-actions .google-tools-note{flex-basis:100%;margin:0}.google-notebook-actions button:disabled{opacity:.6;cursor:wait}
 @media(max-width:560px){.google-notebook-actions{flex-direction:column;align-items:stretch}.google-notebook-actions button{width:100%}}
+
+
+/* Dashboard ringkas + navigasi cepat */
+.quick-nav{position:sticky;top:0;z-index:30;display:flex;gap:8px;overflow-x:auto;padding:10px max(5%,calc((100% - 1180px)/2));background:rgba(23,19,15,.96);border-bottom:1px solid #6b5131;backdrop-filter:blur(12px);scrollbar-width:thin}
+.quick-nav a{flex:0 0 auto;padding:9px 13px;border:1px solid #6b5131;border-radius:999px;color:#ead7b6;text-decoration:none;font-size:12px;font-weight:700}
+.quick-nav a:hover,.quick-actions a:hover{background:#594126;color:#fff1d3}
+.office-intro{padding:34px 10px 22px}
+.quick-actions{display:flex;justify-content:center;flex-wrap:wrap;gap:10px;margin-top:18px}
+.quick-actions a{padding:11px 16px;border:1px solid #9a7746;border-radius:9px;background:#2b2118;color:#f1d6a5;text-decoration:none;font-size:12px;font-weight:800}
+.quick-task-helper{max-width:1180px;margin:12px auto 30px;padding:16px 18px;border:1px solid #6b5131;border-radius:13px;background:#241c15;display:flex;justify-content:space-between;align-items:center;gap:16px}
+.quick-task-helper strong,.quick-task-helper span{display:block}
+.quick-task-helper strong{color:#f3d69d;font-size:14px}
+.quick-task-helper span{color:#b7a58b;font-size:11px;margin-top:4px}
+.quick-task-buttons{display:flex;flex-wrap:wrap;gap:8px}
+.quick-task-buttons button{padding:9px 12px;border:1px solid #80643b;border-radius:8px;background:#342719;color:#ead7b6;font-size:11px;font-weight:700;cursor:pointer}
+.quick-task-buttons button:hover{background:#594126}
+#task-panel,#work-monitor,#google-tools,#organization,#zore-office-mount{scroll-margin-top:76px}
+@media(max-width:650px){.quick-task-helper{margin:10px 12px 24px;align-items:stretch;flex-direction:column}.quick-task-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.quick-task-buttons button{min-height:42px}.quick-nav{padding:9px 12px}.quick-actions a{flex:1 1 42%}}
