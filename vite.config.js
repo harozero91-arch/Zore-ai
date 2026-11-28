@@ -6,8 +6,16 @@ export default defineConfig({
     cssCodeSplit: true,
     sourcemap: false,
     rollupOptions: {
+      input: {
+        main: "index.html",
+        babylonPreview: "babylon-preview.html"
+      },
       output: {
         manualChunks(id) {
+          if (id.includes("/node_modules/@babylonjs/")) {
+            return "babylon-vendor";
+          }
+
           if (id.includes("/node_modules/three/")) {
             return "three-vendor";
           }
