@@ -3,6 +3,7 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 const OFFICE = { name: "Kantor Terpadu", x: 0, z: 0, w: 42, d: 30 };
 
@@ -91,17 +92,17 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xd8d0c1);
   scene.fog = new THREE.Fog(0xd8d0c1, 65, 115);
-  const camera = new THREE.PerspectiveCamera(48, 1, 0.1, 180);
-  camera.position.set(38, 40, 43);
+  const isMobile = window.matchMedia?.("(max-width: 760px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
+  const camera = new THREE.PerspectiveCamera(isMobile ? 52 : 46, 1, 0.1, 220);
+  camera.position.set(34, 37, 39);
   camera.lookAt(0, 1.5, 0);
 
-  const isMobile = window.matchMedia?.("(max-width: 760px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
   const deviceCores = navigator.hardwareConcurrency || 4;
   const qualityTier = !isMobile && deviceCores >= 8 ? "high" : deviceCores <= 4 ? "low" : "balanced";
   const renderer = new THREE.WebGLRenderer({
     antialias: qualityTier !== "low", alpha: false, powerPreference: "high-performance"
   });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.2 : qualityTier === "high" ? 1.75 : 1.4));
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.45 : qualityTier === "high" ? 2 : 1.6));
   renderer.shadowMap.enabled = options.shadows !== false;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
@@ -129,12 +130,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const sun = new THREE.DirectionalLight(0xffe8c9, 2.25);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
-  sun.shadow.mapSize.set(shadowResolution, shadowResolution);
+  sun.shadow.mapSize.set(isMobile ? 1536 : shadowResolution === 2048 ? 3072 : 2048, isMobile ? 1536 : shadowResolution === 2048 ? 3072 : 2048);
   sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
   sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 90;
   sun.shadow.bias = -0.00012; sun.shadow.normalBias = 0.025;
-  sun.shadow.radius = qualityTier === "high" ? 3 : 2;
+  sun.shadow.radius = qualityTier === "high" ? 4 : 3;
   scene.add(sun);
   const chandelier = new THREE.PointLight(0xffd99a, 34, 45);
   chandelier.position.set(0, 9, 0); scene.add(chandelier);
@@ -167,12 +168,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const emeraldMat = material(COLORS.emerald, 0.7);
 
   function box(parent, x, y, z, w, h, d, mat, cast = true) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+    const bevel = Math.max(0.003, Math.min(0.075, Math.min(w, h, d) * 0.14));
+    const geometry = new RoundedBoxGeometry(w, h, d, 2, bevel);
+    const mesh = new THREE.Mesh(geometry, mat);
     mesh.position.set(x, y, z); mesh.castShadow = cast; mesh.receiveShadow = true;
     parent.add(mesh); return mesh;
   }
   function cylinder(parent, x, y, z, r1, r2, h, mat) {
-    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 20), mat);
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(r1, r2, h, 32, 1), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; parent.add(mesh); return mesh;
   }
 
@@ -1078,14 +1081,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const baseAzimuth = spherical.theta;
   const basePolar = spherical.phi;
   // Slightly wider default framing, a little more camera orbit range and sensitivity.
-  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 1.12 };
+  const orbit = { theta: baseAzimuth, phi: basePolar, radius: spherical.radius * 0.98 };
   const limits = {
     minTheta: baseAzimuth - THREE.MathUtils.degToRad(45),
     maxTheta: baseAzimuth + THREE.MathUtils.degToRad(45),
     minPhi: Math.max(THREE.MathUtils.degToRad(26), basePolar - THREE.MathUtils.degToRad(14)),
     maxPhi: Math.min(THREE.MathUtils.degToRad(74), basePolar + THREE.MathUtils.degToRad(14)),
-    minRadius: spherical.radius * 0.62,
-    maxRadius: spherical.radius * 1.75
+    minRadius: spherical.radius * 0.58,
+    maxRadius: spherical.radius * 1.55
   };
   const touchSurface = renderer.domElement;
   const pointers = new Map();
