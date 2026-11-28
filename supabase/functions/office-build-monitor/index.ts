@@ -69,8 +69,11 @@ async function monitorOne(build: any) {
     details: { ...(build.details || {}), jobs, progress_percent: progress, conclusion: run.conclusion, failed_steps: failedSteps },
     updated_at: new Date().toISOString(),
   };
-  const { error: runError } = await admin.from('office_build_runs').update(update).eq('id', build.id);
+  const { data: claimedUpdate, error: runError } = await admin.from('office_build_runs')
+    .update(update).eq('id', build.id).eq('status', build.status).eq('updated_at', build.updated_at)
+    .select('id').maybeSingle();
   if (runError) throw runError;
+  if (!claimedUpdate) return { id: build.id, status: 'already_updated_by_another_monitor' };
   const { error: resultError } = await admin.from('office_task_results').update({
     build_status: status, build_run_id: Number(run.id), build_workflow_url: logUrl,
     build_branch: run.head_branch || build.branch, build_commit_sha: run.head_sha || build.commit_sha,
