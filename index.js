@@ -106,7 +106,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xd8d0c1);
-  scene.fog = new THREE.Fog(0xd8d0c1, 65, 115);
+  scene.fog = new THREE.Fog(0xd8d0c1, 105, 185);
   const isMobile = window.matchMedia?.("(max-width: 760px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
   const camera = new THREE.PerspectiveCamera(isMobile ? 52 : 46, 1, 0.1, 220);
   camera.position.set(34, 37, 39);
@@ -122,14 +122,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.16;
+  renderer.toneMappingExposure = 0.94;
   canvasHost.appendChild(renderer.domElement);
 
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   const environmentRoom = new RoomEnvironment();
   const environmentTarget = pmremGenerator.fromScene(environmentRoom, 0.04);
   scene.environment = environmentTarget.texture;
-  scene.environmentIntensity = qualityTier === "high" ? 0.72 : 0.52;
+  scene.environmentIntensity = qualityTier === "high" ? 0.46 : 0.34;
   environmentRoom.dispose?.();
   pmremGenerator.dispose();
 
@@ -138,31 +138,31 @@ export function mountZoreVirtualOffice(host, options = {}) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
     const ssaoPass = new SSAOPass(scene, camera, 1, 1);
-    ssaoPass.kernelRadius = 12;
+    ssaoPass.kernelRadius = 6;
     ssaoPass.minDistance = 0.004;
     ssaoPass.maxDistance = 0.12;
     composer.addPass(ssaoPass);
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.11, 0.24, 0.9));
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.025, 0.12, 0.96));
     composer.addPass(new OutputPass());
   }
 
   // Layered architectural lighting: soft sky fill, warm key light and cool bounce.
-  const skyFill = new THREE.HemisphereLight(0xfff5e7, 0x46372d, 1.48);
+  const skyFill = new THREE.HemisphereLight(0xfff5e7, 0x46372d, 0.92);
   scene.add(skyFill);
-  scene.add(new THREE.AmbientLight(0xfff4e8, 0.22));
-  const sun = new THREE.DirectionalLight(0xffe6c6, 2.35);
+  scene.add(new THREE.AmbientLight(0xfff4e8, 0.14));
+  const sun = new THREE.DirectionalLight(0xffe6c6, 1.35);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
-  const bounceLight = new THREE.DirectionalLight(0xc6ddff, 0.48);
+  const bounceLight = new THREE.DirectionalLight(0xc6ddff, 0.24);
   bounceLight.position.set(25, 16, 8); scene.add(bounceLight);
-  const warmFill = new THREE.PointLight(0xffd7a1, 19, 30, 1.8);
+  const warmFill = new THREE.PointLight(0xffd7a1, 8, 30, 1.8);
   warmFill.position.set(-11, 5.1, -3); scene.add(warmFill);
-  const neutralFill = new THREE.PointLight(0xffedda, 16, 28, 1.8);
+  const neutralFill = new THREE.PointLight(0xffedda, 7, 28, 1.8);
   neutralFill.position.set(11, 5.0, -3); scene.add(neutralFill);
-  const conferenceBounce = new THREE.PointLight(0xffd49a, 15, 19, 1.65);
+  const conferenceBounce = new THREE.PointLight(0xffd49a, 6, 19, 1.65);
   conferenceBounce.position.set(0, 5.6, 1); scene.add(conferenceBounce);
-  const loungeBounce = new THREE.PointLight(0xd8e8ff, 9, 22, 1.8);
+  const loungeBounce = new THREE.PointLight(0xd8e8ff, 4, 22, 1.8);
   loungeBounce.position.set(12, 4.4, 10); scene.add(loungeBounce);
-  const receptionFill = new THREE.PointLight(0xffd9ad, 12, 18, 1.8);
+  const receptionFill = new THREE.PointLight(0xffd9ad, 5, 18, 1.8);
   receptionFill.position.set(-14, 4.2, 10); scene.add(receptionFill);
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
   const shadowSize = isMobile ? 1024 : shadowResolution === 2048 ? 3072 : 2048;
@@ -173,7 +173,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   sun.shadow.bias = -0.00012; sun.shadow.normalBias = 0.025;
   sun.shadow.radius = qualityTier === "high" ? 4 : 3;
   scene.add(sun);
-  const chandelier = new THREE.PointLight(0xffd99a, 34, 45);
+  const chandelier = new THREE.PointLight(0xffd99a, 17, 45);
   chandelier.position.set(0, 9, 0); scene.add(chandelier);
 
   const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), qualityTier === "high" ? 8 : 4);
@@ -287,27 +287,45 @@ export function mountZoreVirtualOffice(host, options = {}) {
     thickness: 0.12, ior: 1.46, envMapIntensity: 1.1
   });
   const frameMat = material(0x242c2b, 0.35, 0.55);
-  function glassPartition(x, z, length, alongX = true, height = 3.0) {
-    const panel = box(building, x, height / 2 + 0.2, z,
-      alongX ? length : 0.12, height, alongX ? 0.12 : length, glassMat, false);
-    panel.material = glassMat;
-    const count = Math.max(2, Math.floor(length / 1.7));
-    for (let i = 0; i <= count; i++) {
-      const offset = -length / 2 + length * i / count;
-      box(building, x + (alongX ? offset : 0), height / 2 + 0.2,
-        z + (alongX ? 0 : offset), 0.09, height + 0.12, 0.09, frameMat, false);
+  function woodPanelPartition(x, z, length, alongX = true, height = 2.35) {
+    const spanX = alongX ? length : 0.22;
+    const spanZ = alongX ? 0.22 : length;
+    const centerY = height / 2 + 0.2;
+    // Solid walnut divider with a recessed dark reveal and warm wood face panels on both sides.
+    box(building, x, centerY, z, spanX, height, spanZ, shadowWalnut, false);
+    const panelCount = Math.max(2, Math.floor(length / 1.45));
+    const panelWidth = length / panelCount;
+    for (let i = 0; i < panelCount; i++) {
+      const offset = -length / 2 + panelWidth * (i + 0.5);
+      const px = x + (alongX ? offset : 0);
+      const pz = z + (alongX ? 0 : offset);
+      for (const side of [-1, 1]) {
+        box(building, px, centerY, pz + (alongX ? side * 0.116 : 0),
+          alongX ? panelWidth - 0.12 : 0.035, height - 0.3,
+          alongX ? 0.035 : panelWidth - 0.12, woodMat, false);
+        // Fine vertical fluting adds a crafted architectural wood-panel finish.
+        for (const edge of [-1, 1]) {
+          const ex = px + (alongX ? edge * (panelWidth / 2 - 0.055) : side * 0.116);
+          const ez = pz + (alongX ? side * 0.116 : edge * (panelWidth / 2 - 0.055));
+          box(building, ex, centerY, ez, alongX ? 0.035 : 0.028,
+            height - 0.28, alongX ? 0.028 : 0.035, brassSoft, false);
+        }
+      }
     }
-    box(building, x, 0.28, z, alongX ? length : 0.14, 0.12, alongX ? 0.14 : length, frameMat, false);
-    box(building, x, height + 0.26, z, alongX ? length : 0.14, 0.12, alongX ? 0.14 : length, frameMat, false);
+    // Continuous lower plinth, upper cap and narrow champagne-gold reveal.
+    box(building, x, 0.34, z, spanX + (alongX ? 0 : 0.05), 0.22,
+      spanZ + (alongX ? 0.05 : 0), goldMat, false);
+    box(building, x, height + 0.2, z, spanX + 0.12, 0.16, spanZ + 0.12, trimIvory, false);
+    box(building, x, height + 0.29, z, spanX + 0.12, 0.035, spanZ + 0.12, brassSoft, false);
   }
 
-  // Glass team pods on both sides, with wide walkways between them.
-  glassPartition(-15.2, -6.4, 8.0, false, 2.7);
-  glassPartition(-8.6, -10.1, 6.2, true, 2.7);
-  glassPartition(8.8, -10.0, 6.4, true, 2.7);
-  glassPartition(15.3, -5.8, 8.2, false, 2.7);
-  glassPartition(-15.0, 3.1, 7.2, false, 2.7);
-  glassPartition(15.0, 3.1, 7.2, false, 2.7);
+  // Warm walnut divider walls define each work zone while keeping the central circulation open.
+  woodPanelPartition(-15.2, -6.4, 8.0, false, 2.35);
+  woodPanelPartition(-8.6, -10.1, 6.2, true, 2.35);
+  woodPanelPartition(8.8, -10.0, 6.4, true, 2.35);
+  woodPanelPartition(15.3, -5.8, 8.2, false, 2.35);
+  woodPanelPartition(-15.0, 3.1, 7.2, false, 2.35);
+  woodPanelPartition(15.0, 3.1, 7.2, false, 2.35);
 
   const deskTop = material(0xb98250, 0.42);
   const deskEdge = material(0x70452e, 0.48);
@@ -1375,13 +1393,13 @@ export function mountZoreVirtualOffice(host, options = {}) {
       const sky = new THREE.Color(0x171d28).lerp(new THREE.Color(0xd8d0c1), daylight);
       scene.background.copy(sky);
       scene.fog.color.copy(sky);
-      sun.intensity = 0.18 + daylight * 2.02;
-      chandelier.intensity = 76 - daylight * 48;
-      warmFill.intensity = 14 + daylight * 5;
-      neutralFill.intensity = 12 + daylight * 4;
-      conferenceBounce.intensity = 11 + daylight * 4;
-      loungeBounce.intensity = 7 + daylight * 2;
-      receptionFill.intensity = 9 + daylight * 3;
+      sun.intensity = 0.12 + daylight * 1.18;
+      chandelier.intensity = 27 - daylight * 13;
+      warmFill.intensity = 6 + daylight * 2;
+      neutralFill.intensity = 5 + daylight * 2;
+      conferenceBounce.intensity = 4 + daylight * 2;
+      loungeBounce.intensity = 3 + daylight;
+      receptionFill.intensity = 4 + daylight;
       sun.position.set(-22 + daylight * 8, 12 + daylight * 23, 18);
     }
   };
