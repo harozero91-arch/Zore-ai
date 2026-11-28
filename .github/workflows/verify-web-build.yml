@@ -3,7 +3,7 @@ name: Verify ZORE AI website build
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches: [main, 'fix/**', 'feat/**']
     paths:
       - "index.js"
       - "src/**"

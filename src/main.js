@@ -48,6 +48,55 @@ function renderProfile(employee){
   const colleagues=getCollaborators(employee.id);
   return `<div class="profile-heading"><span>PROFIL DAN TANGGUNG JAWAB</span><h2>${esc(employee.name)}</h2><p>${esc(employee.title)} · ${esc(employee.department)}</p></div><div class="profile-grid"><div><h3>Misi jabatan</h3><p>${esc(employee.signature)}.</p></div><div><h3>Keahlian utama</h3><p>${employee.skills.map(esc).join(" · ")}</p></div><div><h3>Melapor kepada</h3><p>${employee.reportsTo?esc(EMPLOYEE_PROFILES.find(e=>e.id===employee.reportsTo)?.name):"Pemilik / pemegang keputusan tertinggi"}</p></div><div><h3>Rekan kolaborasi</h3><p>${colleagues.map(e=>esc(e.name)).join(", ")||"Koordinasi langsung dengan tim."}</p></div><div><h3>Identitas karakter 3D</h3><p>${esc(employee.visual?.face||"wajah khas")} · rambut ${esc(employee.visual?.hair||"profesional")} · busana ${esc(employee.visual?.wardrobe||employee.outfit)} · ekspresi ${esc(employee.visual?.expression||employee.traits.join(", "))} · aksesori ${esc(employee.visual?.accessory||employee.accessory)}.</p></div><div><h3>Batas kewenangan</h3><p>Menjalankan pekerjaan sesuai jabatan, menyerahkan hasil untuk pemeriksaan manajer, dan tidak menyetujui pengeluaran atau tindakan eksternal tanpa persetujuan pemilik.</p></div></div>`;
 }
+function previewHtmlFor(result){
+  const content=String(result?.content||"").trim();
+  if(!content)return null;
+  const fenced=content.match(/```(?:html|htm)\s*\n([\s\S]*?)\n```/i);
+  if(fenced)return fenced[1];
+  const looksLikeHtml=/^\s*(?:<!doctype\s+html|<html\b)/i.test(content);
+  const htmlFile=/\.html?$/i.test(String(result?.file_name||""));
+  const htmlType=/^text\/html(?:\s*;|$)/i.test(String(result?.content_type||""));
+  return looksLikeHtml||htmlFile||htmlType?content:null;
+}
+function renderResultToolbar(result){
+  const preview=previewHtmlFor(result)!==null
+    ?'<button type="button" class="secondary preview-result" data-preview-result="'+esc(result.id)+'">Lihat preview</button>'
+    :'';
+  return '<div class="result-toolbar"><small>Versi '+esc(result.version)+' · '+fmt(result.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(result.content||"")+'">Salin hasil</button>'+preview+'<button type="button" class="secondary download-result" data-download-result="'+esc(result.id)+'">Unduh '+esc(result.file_name||"hasil-pekerjaan.txt")+'</button></div>';
+}
+function openResultPreview(result){
+  const html=previewHtmlFor(result);
+  if(html===null){showNotice("Preview hanya tersedia untuk hasil HTML. Kode sumber tetap dapat dibaca dan diunduh.","error");return;}
+  document.querySelector("#result-preview-dialog")?.remove();
+  const dialog=document.createElement("dialog");
+  dialog.id="result-preview-dialog";
+  dialog.className="result-preview-dialog";
+  const header=document.createElement("div");
+  header.className="result-preview-header";
+  const title=document.createElement("strong");
+  title.textContent="Preview: "+(result.file_name||"hasil-website.html");
+  const close=document.createElement("button");
+  close.type="button";close.className="secondary";close.textContent="Tutup";
+  close.addEventListener("click",()=>dialog.close());
+  header.append(title,close);
+  const note=document.createElement("p");
+  note.className="result-preview-note";
+  note.textContent="Mode pratinjau aman: JavaScript dinonaktifkan dan akses ke halaman utama ZORE AI dibatasi.";
+  const frame=document.createElement("iframe");
+  frame.className="result-preview-frame";
+  frame.title="Pratinjau hasil pekerjaan";
+  frame.setAttribute("sandbox","");
+  const policy='<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; img-src data: blob:; style-src \'unsafe-inline\'; font-src data:;">';
+  const source=/<head\b[^>]*>/i.test(html)
+    ?html.replace(/<head\b[^>]*>/i,match=>match+policy)
+    :'<!doctype html><html><head><meta charset="utf-8">'+policy+'</head><body>'+html+'</body></html>';
+  frame.srcdoc=source;
+  dialog.append(header,note,frame);
+  dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
+  dialog.addEventListener("close",()=>dialog.remove(),{once:true});
+  document.body.appendChild(dialog);
+  dialog.showModal();
+}
 function renderEmployeeStage(stage){
   const employee=Number(stage.stage_order||0)===0?employeeByIdx(1):employeeByIdx(stage.employee_idx);
   const status=stage.status||"queued";
@@ -59,7 +108,7 @@ function renderEmployeeStage(stage){
   <p class="team-stage-instructions">${esc(stage.instructions||"Instruksi tahap tidak tersedia.")}</p>
   <div class="team-stage-meta"><span>Mulai: ${fmt(stage.started_at||stage.locked_at)}</span><span>Diserahkan: ${fmt(stage.completed_at)}</span><span>Versi: ${esc(stage.version||1)}</span></div>
   <section class="employee-report-block"><h5>Laporan karyawan</h5>${reports.length?reports.map(r=>`<div class="employee-report-entry"><div class="report-entry-head"><strong>${esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Catatan revisi":"Catatan sistem")}</strong><small>${fmt(r.created_at)} · ${esc(author)}</small></div><p>${esc(r.body)}</p><button type="button" class="secondary copy-report" data-copy-text="${encodeURIComponent(r.body)}">Salin laporan</button></div>`).join(""):'<p class="report-empty">Belum ada laporan dari tahap ini.</p>'}</section>
-  <section class="employee-deliverables"><h5>Hasil kerja yang diserahkan</h5>${results.length?results.map(r=>`<div class="result-body"><div class="result-toolbar"><small>Versi ${esc(r.version)} · ${fmt(r.created_at)}</small><button type="button" class="secondary copy-report" data-copy-text="${encodeURIComponent(r.content)}">Salin hasil</button>${r.storage_path?`<button type="button" class="secondary download-result" data-download-result="${esc(r.id)}">Unduh ${esc(r.file_name||"berkas hasil")}</button>`:""}</div><pre>${esc(r.content)}</pre></div>`).join(""):'<p class="report-empty">Belum ada hasil kerja yang tersimpan.</p>'}</section>
+  <section class="employee-deliverables"><h5>Hasil kerja yang diserahkan</h5>${results.length?results.map(r=>`<div class="result-body">${renderResultToolbar(r)}<pre>${esc(r.content)}</pre></div>`).join(""):'<p class="report-empty">Belum ada hasil kerja yang tersimpan.</p>'}</section>
   <section class="employee-activity-block"><h5>Jejak aktivitas</h5>${activities.length?activities.map(a=>`<p><time>${fmt(a.created_at)}</time> · ${esc(a.message)}</p>`).join(""):'<p class="report-empty">Belum ada aktivitas tercatat untuk tahap ini.</p>'}</section>
   </details>${stage.last_error?'<p class="task-error">Kendala sistem: '+esc(stage.last_error)+'</p>':""}${Number(stage.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(stage.title||"")&&status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(stage.id)+'" class="approve">Setujui hasil akhir</button><button data-revise="'+esc(stage.id)+'" class="secondary">Minta revisi akhir</button></div>':""}</article>`;
 }
@@ -80,7 +129,7 @@ function taskCard(task){
   const videoAction=isFinalMerge&&results.length>0?'<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="'+esc(task.id)+'">Buat MP4 + dubbing hasil gabungan</button><small>MP4 dibuat hanya dari keluaran final manajer setelah pemeriksaan dan penggabungan. Narasi suara Bahasa Indonesia disertakan.</small></div>':"";
   const isMarketing=/pemasaran|marketing|kampanye|brand|promosi|iklan|caption|konten sosial/i.test((task.title||"")+" "+(task.instructions||""));
   const pomelliAction=isMarketing?'<div class="task-video-actions pomelli-handoff"><button type="button" class="secondary" data-pomelli-task="'+esc(task.id)+'">Siapkan brief karyawan untuk Pomelli</button><small>Nadia: strategi & brief. Fajar: arahan visual & kebutuhan aset. Brief dilengkapi hasil kerja tim yang sudah tersimpan; setelah membuat aset di Pomelli, unggah hasilnya kembali pada tugas ini untuk pemeriksaan Nadia.</small></div>':"";
-  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${esc(taskStatusLabel(task))}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoAction}${pomelliAction}${renderTeamReport(task)}${status==="submitted"&&(!task.chain_id||Number(task.stage_order||0)===0)?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui rencana kerja awal</button><button data-revise="'+esc(task.id)+'" class="secondary">Ubah rencana</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${esc(taskStatusLabel(task))}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body">'+renderResultToolbar(r)+'<pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoAction}${pomelliAction}${renderTeamReport(task)}${status==="submitted"&&(!task.chain_id||Number(task.stage_order||0)===0)?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui rencana kerja awal</button><button data-revise="'+esc(task.id)+'" class="secondary">Ubah rencana</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
 async function googleNotebookApi(path,options={}){
   if(!googleNotebookAccessToken)throw new Error("Akun Google Notebook belum dihubungkan. Tekan Hubungkan Google terlebih dahulu.");
@@ -205,7 +254,7 @@ function bindWorkMonitor(){
     const filterButton=event.target.closest("[data-status-filter]");
     if(filterButton){
       activeTaskFilter=filterButton.dataset.statusFilter;
-      monitor.querySelector(".work-stats").parentElement.innerHTML=renderWorkMonitorContent();
+      const temp=document.createElement("div");temp.innerHTML=renderWorkMonitorContent();monitor.querySelector(".work-stats")?.replaceWith(temp.querySelector(".work-stats"));monitor.querySelector(".work-list")?.replaceWith(temp.querySelector(".work-list"));
       return;
     }
     if(event.target.closest("#refresh-work"))syncOffice(true);
@@ -280,7 +329,7 @@ async function handleWorkListClick(event){
   const downloadButton=target.closest("[data-download-result]");
   if(downloadButton){
     const result=resultRows.find(item=>String(item.id)===String(downloadButton.dataset.downloadResult));
-    if(!result?.storage_path){showNotice("Berkas hasil belum tersimpan di penyimpanan.","error");return;}
+    if(!result||typeof result.content!=="string"){showNotice("Isi hasil belum tersedia untuk diunduh.","error");return;}
     const original=downloadButton.textContent;downloadButton.disabled=true;downloadButton.textContent="Menyiapkan unduhan…";
     try{
       if(typeof result.content!=="string"||!result.content.length)throw new Error("Isi hasil belum tersedia untuk diunduh.");
@@ -292,6 +341,12 @@ async function handleWorkListClick(event){
     }catch(error){downloadButton.textContent=original;showNotice("Berkas belum dapat diunduh: "+(error?.message||"Kesalahan penyimpanan."),"error");}
     finally{downloadButton.disabled=false;}
     return;
+  }
+  const previewButton=target.closest("[data-preview-result]");
+  if(previewButton){
+    const result=resultRows.find(item=>String(item.id)===String(previewButton.dataset.previewResult));
+    if(!result){showNotice("Hasil pekerjaan tidak ditemukan. Perbarui daftar pekerjaan.","error");return;}
+    openResultPreview(result);return;
   }
   const pomelliButton=target.closest("[data-pomelli-task]");
   if(pomelliButton){

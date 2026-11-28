@@ -768,3 +768,14 @@ footer {
 .work-stat-filter:hover,.work-stat-filter.active{border-color:#d0a45d;background:#594126;transform:translateY(-1px)}
 .work-stat-filter.active span{color:#fff0d1}
 .work-stat-filter:focus-visible{outline:2px solid #e0bd77;outline-offset:3px}
+
+
+/* Preview aman untuk hasil HTML dari karyawan AI */
+.result-toolbar{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.result-preview-dialog{width:min(1100px,94vw);height:min(820px,92dvh);max-width:none;max-height:none;padding:16px;border:1px solid #9b7848;border-radius:16px;background:#211a14;color:#f3e9d7;box-shadow:0 24px 80px #000b}
+.result-preview-dialog::backdrop{background:rgba(0,0,0,.78);backdrop-filter:blur(4px)}
+.result-preview-header{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:8px;color:#f3d69d}
+.result-preview-header strong{overflow-wrap:anywhere}
+.result-preview-note{margin:0 0 12px;color:#c8b99f;font-size:12px;line-height:1.5}
+.result-preview-frame{display:block;width:100%;height:calc(100% - 76px);min-height:260px;border:1px solid #80643b;border-radius:10px;background:#fff}
+@media(max-width:600px){.result-preview-dialog{width:96vw;height:92dvh;padding:10px}.result-preview-frame{height:calc(100% - 92px)}.result-preview-header{align-items:flex-start}}
