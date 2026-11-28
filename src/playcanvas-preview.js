@@ -26,7 +26,7 @@ const sun=new pc.Entity("Warm directional light");
 sun.addComponent("light",{type:"directional",color:new pc.Color(1,.86,.68),intensity:1.35,castShadows:!mobile,shadowResolution:mobile?512:1024,normalOffsetBias:.05});
 sun.setEulerAngles(48,32,0);app.root.addChild(sun);
 const fill=new pc.Entity("Soft ambient fill");fill.addComponent("light",{type:"omni",color:new pc.Color(.66,.75,1),intensity:.18,range:45});fill.setPosition(0,8,3);app.root.addChild(fill);
-function material(name,hex,metalness=0,shininess=35){const c=pc.Color.fromString(hex);const m=new pc.StandardMaterial();m.name=name;m.diffuse=c;m.specular=new pc.Color(.32,.28,.22);m.metalness=metalness;m.shininess=shininess;m.update();return m;}
+function material(name,hex,metalness=0,shininess=35){const c=new pc.Color(parseInt(hex.slice(1,3),16)/255,parseInt(hex.slice(3,5),16)/255,parseInt(hex.slice(5,7),16)/255);const m=new pc.StandardMaterial();m.name=name;m.diffuse=c;m.specular=new pc.Color(.32,.28,.22);m.metalness=metalness;m.shininess=shininess;m.update();return m;}
 const marble=material("Ivory marble","#d8cebd",.12,70),wood=material("Mahogany wood","#4a2b20",.08,48),gold=material("Champagne gold","#c5a36b",.72,90),wall=material("Warm plaster","#b9a78f",0,18),green=material("Emerald upholstery","#205846",0,22),dark=material("Dark details","#211b18",.05,25),skin=material("Natural skin","#c58d68",0,18),navy=material("Navy suit","#263544",0,24),screen=material("Monitor glass","#263a42",.25,80);
 function primitive(name,type,x,y,z,sx,sy,sz,mat){const e=new pc.Entity(name);e.addComponent("render",{type,material:mat,castShadows:!mobile,receiveShadows:true});e.setPosition(x,y,z);e.setLocalScale(sx,sy,sz);app.root.addChild(e);return e;}
 const box=(n,x,y,z,sx,sy,sz,m)=>primitive(n,"box",x,y,z,sx,sy,sz,m);
@@ -61,6 +61,5 @@ canvas.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;c
 function endPointer(e){pointers.delete(e.pointerId);previous=null;previousPinch=0;}canvas.addEventListener("pointerup",endPointer);canvas.addEventListener("pointercancel",endPointer);
 canvas.addEventListener("wheel",e=>{e.preventDefault();distance=clamp(distance+e.deltaY*.018,22,48);updateCamera();},{passive:false});
 const resizeObserver=new ResizeObserver(()=>{if(!disposed){app.resizeCanvas(canvas.clientWidth,canvas.clientHeight);}});resizeObserver.observe(viewport);
-document.addEventListener("visibilitychange",()=>{if(document.hidden)app.tick=()=>{};else if(!disposed)app.tick=undefined;});
 status.textContent="PlayCanvas Engine aktif · prototipe uji";
 window.addEventListener("beforeunload",()=>{disposed=true;resizeObserver.disconnect();app.destroy();});
