@@ -122,14 +122,14 @@ export function mountZoreVirtualOffice(host, options = {}) {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.12;
+  renderer.toneMappingExposure = 1.16;
   canvasHost.appendChild(renderer.domElement);
 
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   const environmentRoom = new RoomEnvironment();
   const environmentTarget = pmremGenerator.fromScene(environmentRoom, 0.04);
   scene.environment = environmentTarget.texture;
-  scene.environmentIntensity = qualityTier === "high" ? 0.62 : 0.42;
+  scene.environmentIntensity = qualityTier === "high" ? 0.72 : 0.52;
   environmentRoom.dispose?.();
   pmremGenerator.dispose();
 
@@ -146,10 +146,24 @@ export function mountZoreVirtualOffice(host, options = {}) {
     composer.addPass(new OutputPass());
   }
 
-  scene.add(new THREE.HemisphereLight(0xfff4df, 0x594536, 1.3));
-  scene.add(new THREE.AmbientLight(0xffffff, 0.28));
-  const sun = new THREE.DirectionalLight(0xffe8c9, 2.25);
+  // Layered architectural lighting: soft sky fill, warm key light and cool bounce.
+  const skyFill = new THREE.HemisphereLight(0xfff5e7, 0x46372d, 1.48);
+  scene.add(skyFill);
+  scene.add(new THREE.AmbientLight(0xfff4e8, 0.22));
+  const sun = new THREE.DirectionalLight(0xffe6c6, 2.35);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
+  const bounceLight = new THREE.DirectionalLight(0xc6ddff, 0.48);
+  bounceLight.position.set(25, 16, 8); scene.add(bounceLight);
+  const warmFill = new THREE.PointLight(0xffd7a1, 19, 30, 1.8);
+  warmFill.position.set(-11, 5.1, -3); scene.add(warmFill);
+  const neutralFill = new THREE.PointLight(0xffedda, 16, 28, 1.8);
+  neutralFill.position.set(11, 5.0, -3); scene.add(neutralFill);
+  const meetingFill = new THREE.PointLight(0xffd49a, 23, 19, 1.65);
+  meetingFill.position.set(0, 5.6, 1); scene.add(meetingFill);
+  const loungeFill = new THREE.PointLight(0xd8e8ff, 13, 22, 1.8);
+  loungeFill.position.set(12, 4.4, 10); scene.add(loungeFill);
+  const receptionFill = new THREE.PointLight(0xffd9ad, 12, 18, 1.8);
+  receptionFill.position.set(-14, 4.2, 10); scene.add(receptionFill);
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
   const shadowSize = isMobile ? 1024 : shadowResolution === 2048 ? 3072 : 2048;
   sun.shadow.mapSize.set(shadowSize, shadowSize);
@@ -1338,8 +1352,13 @@ export function mountZoreVirtualOffice(host, options = {}) {
       const sky = new THREE.Color(0x171d28).lerp(new THREE.Color(0xd8d0c1), daylight);
       scene.background.copy(sky);
       scene.fog.color.copy(sky);
-      sun.intensity = 0.22 + daylight * 1.88;
-      chandelier.intensity = 68 - daylight * 44;
+      sun.intensity = 0.18 + daylight * 2.02;
+      chandelier.intensity = 76 - daylight * 48;
+      warmFill.intensity = 14 + daylight * 5;
+      neutralFill.intensity = 12 + daylight * 4;
+      meetingFill.intensity = 18 + daylight * 5;
+      loungeFill.intensity = 10 + daylight * 3;
+      receptionFill.intensity = 9 + daylight * 3;
       sun.position.set(-22 + daylight * 8, 12 + daylight * 23, 18);
     }
   };
