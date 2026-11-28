@@ -62,17 +62,11 @@ function renderTeamReport(task){
 }
 function taskCard(task){
   const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
-  const results=resultRows.filter(r=>r.task_id===task.id).sort((a,b)=>b.version-a.version);
-  const videoStages=task.chain_id?officeData.tasks.filter(t=>t.chain_id===task.chain_id).sort((a,b)=>Number(a.stage_order||0)-Number(b.stage_order||0)):[task];
-  const videoResults=videoStages.flatMap(stage=>{
-    const stageEmployee=employeeByIdx(stage.employee_idx);
-    return resultRows.filter(r=>String(r.task_id)===String(stage.id)).sort((a,b)=>Number(a.version)-Number(b.version)).map(r=>({
-      ...r,
-      content:"TAHAP "+(Number(stage.stage_order||0)+1)+" · "+(stageEmployee?.name||"Tim ZORE AI")+" · "+stage.title+"\\n\\n"+r.content
-    }));
-  });
-  const reports=officeData.reports.filter(r=>r.task_id===task.id);
-  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoResults.length?`<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="${esc(task.id)}">Buat video MP4 dari hasil tugas</button><small>Video berisi materi hasil AI yang tersimpan, bukan rekaman animasi kantor.</small></div>`:""}${renderTeamReport(task)}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
+  const results=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version));
+  const reports=officeData.reports.filter(r=>String(r.task_id)===String(task.id));
+  const isFinalMerge=!!task.chain_id&&Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||"")&&["submitted","approved"].includes(status);
+  const videoAction=isFinalMerge&&results.length===1?'<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="'+esc(task.id)+'">Buat MP4 + dubbing hasil gabungan</button><small>MP4 dibuat hanya dari keluaran final manajer setelah pemeriksaan dan penggabungan. Narasi suara Bahasa Indonesia disertakan.</small></div>':"";
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoAction}${renderTeamReport(task)}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
@@ -225,36 +219,40 @@ async function performTaskDeletion(taskId,deleteButton){
 }
 async function exportTaskMp4(taskId,button){
   const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
-  const stages=task?.chain_id?officeData.tasks.filter(item=>item.chain_id===task.chain_id).sort((a,b)=>Number(a.stage_order||0)-Number(b.stage_order||0)):(task?[task]:[]);
-  const results=stages.flatMap(stage=>{
-    const employee=employeeByIdx(stage.employee_idx);
-    return resultRows.filter(item=>String(item.task_id)===String(stage.id)).sort((a,b)=>Number(a.version)-Number(b.version)).map(item=>({
-      ...item,
-      content:"TAHAP "+(Number(stage.stage_order||0)+1)+" · "+(employee?.name||"Tim ZORE AI")+" · "+stage.title+"\\n\\n"+item.content
-    }));
-  });
-  if(!task||!results.length){showNotice("Hasil AI untuk tugas ini belum tersedia. Video belum dibuat.","error");return;}
+  const isFinalMerge=!!task?.chain_id&&Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||"")&&["submitted","approved"].includes(task.status);
+  const results=resultRows.filter(item=>String(item.task_id)===String(taskId)).sort((a,b)=>Number(b.version)-Number(a.version)).slice(0,1);
+  if(!isFinalMerge||results.length!==1||!results[0]?.content?.trim()){
+    showNotice("MP4 hanya tersedia untuk hasil akhir gabungan yang sudah diperiksa manajer.","error");return;
+  }
   const original=button.textContent;
-  button.disabled=true;button.textContent="Menyusun video MP4…";
+  button.disabled=true;button.textContent="Membuat dubbing dan MP4…";
   try{
     const employee=employeeByIdx(task.employee_idx);
+    const cleanText=String(results[0].content).replace(/```[a-zA-Z0-9_-]*\n?/g,"").replace(/`{3}/g,"").trim();
+    const narration="Hasil penggabungan akhir ZORE AI. Judul pekerjaan: "+task.title+". Pemeriksaan dan penggabungan dilakukan oleh "+(employee?.name||"Manajer ZORE AI")+". Berikut isi hasil akhir. "+cleanText;
+    if(narration.length>14000)throw new Error("Hasil gabungan terlalu panjang untuk dubbing otomatis. Ringkas hasil final terlebih dahulu, lalu coba lagi.");
+    const {data:voiceData,error:voiceError}=await supabase.functions.invoke("office-voice",{body:{text:narration}});
+    if(voiceError)throw new Error(voiceError.message||"Layanan dubbing tidak merespons.");
+    if(!voiceData?.ok||!voiceData.audio_base64)throw new Error(voiceData?.error||"Audio dubbing tidak berhasil dibuat.");
+    button.textContent="Menyusun video dan audio…";
     const blob=await createTaskMp4({
       title:task.title,
-      instructions:task.instructions,
-      employeeName:employee?.name||"Tim ZORE AI",
-      results
+      employeeName:employee?.name||"Manajer ZORE AI",
+      results,
+      audioBase64:voiceData.audio_base64,
+      sampleRate:Number(voiceData.sample_rate)||24000
     });
-    if(!blob||blob.type!=="video/mp4"||blob.size<1000)throw new Error("File MP4 tidak berhasil dibuat dengan benar.");
+    if(!blob||blob.type!=="video/mp4"||blob.size<1000)throw new Error("File MP4 dengan dubbing tidak berhasil dibuat.");
     const url=URL.createObjectURL(blob);
     const link=document.createElement("a");
-    const safeName=String(task.title||"hasil-zore-ai").normalize("NFKD").replace(/[^a-zA-Z0-9-_]+/g,"-").replace(/^-+|-+$/g,"").slice(0,70)||"hasil-zore-ai";
-    link.href=url;link.download=safeName+".mp4";document.body.appendChild(link);link.click();link.remove();
+    const safeName=String(task.title||"hasil-gabungan-zore-ai").normalize("NFKD").replace(/[^a-zA-Z0-9-_]+/g,"-").replace(/^-+|-+$/g,"").slice(0,70)||"hasil-gabungan-zore-ai";
+    link.href=url;link.download=safeName+"-dubbing.mp4";document.body.appendChild(link);link.click();link.remove();
     setTimeout(()=>URL.revokeObjectURL(url),30000);
-    button.textContent="MP4 berhasil dibuat";
-    showNotice("Video MP4 berhasil dibuat dan unduhan dimulai.","success");
+    button.textContent="MP4 + dubbing berhasil dibuat";
+    showNotice("MP4 hasil penggabungan beserta dubbing Bahasa Indonesia berhasil dibuat.","success");
   }catch(error){
     button.disabled=false;button.textContent=original;
-    showNotice("Video MP4 belum dapat dibuat: "+(error?.message||"Kesalahan tidak diketahui."),"error");
+    showNotice("MP4 belum dapat dibuat: "+(error?.message||"Kesalahan tidak diketahui."),"error");
   }
 }
 async function handleReview(event){
