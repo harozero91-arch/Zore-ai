@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
@@ -195,6 +196,45 @@ export function mountZoreVirtualOffice(host, options = {}) {
   floor.rotation.x = -Math.PI / 2; floor.position.y = -0.16; floor.receiveShadow = true; scene.add(floor);
 
   const building = new THREE.Group(); scene.add(building);
+
+  // Load the Blender-generated executive office automatically. Keep the
+  // procedural office visible as a resilient fallback if the GLB is unavailable.
+  let importedOfficeRoot = null;
+  const officeModelLoader = new GLTFLoader();
+  officeModelLoader.load(
+    "/assets/blender/zore-ai-executive-office.glb",
+    gltf => {
+      if (disposed) return;
+      const model = gltf.scene;
+      const bounds = new THREE.Box3().setFromObject(model);
+      const size = bounds.getSize(new THREE.Vector3());
+      const center = bounds.getCenter(new THREE.Vector3());
+      const largest = Math.max(size.x, size.y, size.z);
+      if (!Number.isFinite(largest) || largest <= 0) {
+        console.warn("ZORE AI: ukuran model Blender tidak valid; memakai kantor prosedural.");
+        return;
+      }
+      // Match the existing office footprint and keep the imported floor at ground level.
+      const fitScale = Math.min(42 / Math.max(size.x, 0.001), 30 / Math.max(size.z, 0.001), 1.8);
+      model.scale.setScalar(fitScale);
+      model.position.set(-center.x * fitScale, -bounds.min.y * fitScale, -center.z * fitScale);
+      // The Blender export contains static sample people. Keep the live animated
+      // employee characters from the main Three.js scene instead.
+      model.traverse(object => {
+        if (object.isMesh && /^ZORE employee/i.test(object.name)) object.visible = false;
+      });
+      scene.add(model);
+      importedOfficeRoot = model;
+      building.visible = false;
+      floor.visible = false;
+      if (label) label.textContent = "Kantor Terpadu · Model Blender aktif";
+      console.info("ZORE AI: model kantor Blender berhasil dimuat.", { size, fitScale });
+    },
+    undefined,
+    error => {
+      console.warn("ZORE AI: model Blender tidak dapat dimuat; memakai kantor prosedural.", error);
+    }
+  );
   const wallMat = new THREE.MeshPhysicalMaterial({
     color: COLORS.ivory, roughness: 0.82, metalness: 0.015, clearcoat: 0.08, clearcoatRoughness: 0.7
   });
