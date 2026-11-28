@@ -212,7 +212,7 @@ function bindWorkMonitor(){
   });
 }
 function renderWorkspaceSnapshot(){
-  return '<section class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div>'+renderWorkMonitorContent()+'</section>';
+  return '<section id="work-monitor" class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div>'+renderWorkMonitorContent()+'</section>';
 }
 async function assignTask(event){
   event.preventDefault();const button=event.currentTarget.querySelector("button[type=submit]");const msg=document.querySelector("#task-message");
