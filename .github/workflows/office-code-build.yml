@@ -1,0 +1,191 @@
+name: ZORE AI generated code build and repository archive
+run-name: ZORE AI Build ${{ inputs.task_id }} v${{ inputs.version }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_id:
+        description: "UUID tugas ZORE AI"
+        required: true
+        type: string
+      version:
+        description: "Versi hasil pekerjaan"
+        required: true
+        type: string
+      employee:
+        description: "Karyawan penanggung jawab"
+        required: true
+        type: string
+      manifest_url:
+        description: "Signed URL manifest file dari Supabase Storage"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zore-code-build-${{ inputs.task_id }}-v${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  validate-and-build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout source repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Download generated file manifest
+        env:
+          MANIFEST_URL: ${{ inputs.manifest_url }}
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error --location --max-time 60 "$MANIFEST_URL" -o /tmp/zore-manifest.json
+          test -s /tmp/zore-manifest.json
+          python3 - <<'PY'
+          import json, pathlib, re, base64
+          data=json.loads(pathlib.Path('/tmp/zore-manifest.json').read_text())
+          files=data.get('files')
+          if not isinstance(files,list) or not files or len(files)>30:
+              raise SystemExit('Manifest harus berisi 1-30 file.')
+          root=pathlib.Path('generated-source').resolve()
+          root.mkdir(parents=True,exist_ok=True)
+          total=0
+          for item in files:
+              name=item.get('path')
+              content=item.get('content')
+              encoded=item.get('content_base64')
+              if not isinstance(name,str) or not (isinstance(content,str) or isinstance(encoded,str)):
+                  raise SystemExit('Path atau isi file tidak valid.')
+              p=pathlib.PurePosixPath(name)
+              if p.is_absolute() or '..' in p.parts or not p.parts:
+                  raise SystemExit('Path file berbahaya: '+name)
+              if any(part.lower() in ('.git','.github','node_modules') for part in p.parts):
+                  raise SystemExit('Path sistem tidak diizinkan: '+name)
+              if p.name.lower() in ('.env','.npmrc','.pypirc') or p.name.lower().endswith(('.pem','.key','.p12')):
+                  raise SystemExit('Nama file sensitif ditolak: '+name)
+              raw=base64.b64decode(encoded,validate=True) if isinstance(encoded,str) else content.encode('utf-8')
+              if len(raw)>512000: raise SystemExit('Ukuran file melebihi 512 KB: '+name)
+              total+=len(raw)
+              if total>3000000: raise SystemExit('Total file melebihi 3 MB.')
+              target=(root / pathlib.Path(*p.parts)).resolve()
+              if root not in target.parents: raise SystemExit('Path keluar dari direktori hasil.')
+              target.parent.mkdir(parents=True,exist_ok=True)
+              target.write_bytes(raw)
+          print(f'ZORE_FILES_WRITTEN={len(files)} TOTAL_BYTES={total}')
+          PY
+
+      - name: Validate generated source files
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          from html.parser import HTMLParser
+          root=Path('generated-source')
+          files=[p for p in root.rglob('*') if p.is_file()]
+          if not files: raise SystemExit('Tidak ada file sumber.')
+          for p in files:
+              if p.stat().st_size == 0: raise SystemExit(f'File kosong: {p}')
+              suffix=p.suffix.lower()
+              if suffix=='.json':
+                  import json; json.loads(p.read_text())
+              elif suffix in ('.html','.htm'):
+                  class Check(HTMLParser): pass
+                  Check().feed(p.read_text())
+              elif suffix=='.svg':
+                  text=p.read_text()
+                  if '<svg' not in text.lower() or '</svg>' not in text.lower(): raise SystemExit(f'SVG tidak lengkap: {p}')
+              print('VALID',p,p.stat().st_size)
+          PY
+          while IFS= read -r -d '' file; do
+            case "$file" in
+              *.js|*.mjs|*.cjs) node --check "$file" ;;
+            esac
+          done < <(find generated-source -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.cjs' \) -print0)
+
+      - name: Install dependencies without lifecycle scripts and run project build
+        if: hashFiles('generated-source/package.json') != ''
+        working-directory: generated-source
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          node -e "const p=require('./package.json'); if (!p.scripts || !p.scripts.build) process.exit(0)"
+          npm run build --if-present
+
+      - name: Assemble verified deliverables
+        run: |
+          set -euo pipefail
+          mkdir -p deliverables/source deliverables/build
+          cp -a generated-source/. deliverables/source/
+          if [ -d generated-source/dist ]; then cp -a generated-source/dist/. deliverables/build/
+          elif [ -d generated-source/build ]; then cp -a generated-source/build/. deliverables/build/
+          else cp -a generated-source/. deliverables/build/
+          fi
+          cat > deliverables/BUILD-REPORT.txt <<EOF
+          ZORE AI BUILD REPORT
+          Task: ${{ inputs.task_id }}
+          Version: ${{ inputs.version }}
+          Employee: ${{ inputs.employee }}
+          Status: PASSED
+          Commit source: ${GITHUB_SHA}
+          EOF
+          find deliverables -type f -printf '%p %s bytes\n' | sort
+
+      - name: Upload verified deliverables
+        uses: actions/upload-artifact@v4
+        with:
+          name: zore-build-${{ inputs.task_id }}-v${{ inputs.version }}
+          path: deliverables/**
+          if-no-files-found: error
+          retention-days: 30
+
+  archive-to-repository:
+    needs: validate-and-build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+
+      - name: Download verified deliverables
+        uses: actions/download-artifact@v4
+        with:
+          name: zore-build-${{ inputs.task_id }}-v${{ inputs.version }}
+          path: /tmp/zore-verified
+
+      - name: Commit immutable task version to GitHub
+        env:
+          TASK_ID: ${{ inputs.task_id }}
+          VERSION: ${{ inputs.version }}
+          EMPLOYEE: ${{ inputs.employee }}
+        run: |
+          set -euo pipefail
+          case "$TASK_ID" in
+            *[!a-fA-F0-9-]*|'') echo "Invalid task UUID"; exit 1 ;;
+          esac
+          case "$VERSION" in
+            *[!0-9]*|'') echo "Invalid version"; exit 1 ;;
+          esac
+          TARGET="public/work-results/$TASK_ID/v$VERSION"
+          mkdir -p "$TARGET"
+          cp -a /tmp/zore-verified/. "$TARGET/"
+          printf 'Task: %s\nVersion: %s\nEmployee: %s\n' "$TASK_ID" "$VERSION" "$EMPLOYEE" > "$TARGET/OWNER.txt"
+          git config user.name "zore-ai-build[bot]"
+          git config user.email "zore-ai-build[bot]@users.noreply.github.com"
+          git add "$TARGET"
+          git commit -m "Store verified ZORE AI deliverables $TASK_ID v$VERSION" || {
+            echo "No repository changes to commit"
+            exit 0
+          }
+          git push origin "HEAD:refs/heads/zore-artifact/$TASK_ID-v$VERSION"
+
+      - name: Publish repository archive summary
+        run: |
+          echo "Verified deliverables committed to public/work-results/${{ inputs.task_id }}/v${{ inputs.version }}."
