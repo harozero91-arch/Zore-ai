@@ -72,7 +72,7 @@ function taskCard(task){
   const isFinalMerge=!!task.chain_id&&Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||"")&&["submitted","approved"].includes(status);
   const videoAction=isFinalMerge&&results.length>0?'<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="'+esc(task.id)+'">Buat MP4 + dubbing hasil gabungan</button><small>MP4 dibuat hanya dari keluaran final manajer setelah pemeriksaan dan penggabungan. Narasi suara Bahasa Indonesia disertakan.</small></div>':"";
   const isMarketing=/pemasaran|marketing|kampanye|brand|promosi|iklan|caption|konten sosial/i.test((task.title||"")+" "+(task.instructions||""));
-  const pomelliAction=isMarketing?'<div class="task-video-actions pomelli-handoff"><button type="button" class="secondary" data-pomelli-task="'+esc(task.id)+'">Siapkan brief karyawan untuk Pomelli</button><small>Nadia menyiapkan brief kampanye dari tugas ini; brief disalin dan Pomelli dibuka untuk proses kreatif. Hasil Pomelli perlu diimpor kembali secara manual.</small></div>':"";
+  const pomelliAction=isMarketing?'<div class="task-video-actions pomelli-handoff"><button type="button" class="secondary" data-pomelli-task="'+esc(task.id)+'">Siapkan brief karyawan untuk Pomelli</button><small>Nadia: strategi & brief. Fajar: arahan visual & kebutuhan aset. Brief dilengkapi hasil kerja tim yang sudah tersimpan; setelah membuat aset di Pomelli, unggah hasilnya kembali pada tugas ini untuk pemeriksaan Nadia.</small></div>':"";
   return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoAction}${pomelliAction}${renderTeamReport(task)}${status==="submitted"&&(!task.chain_id||Number(task.stage_order||0)===0)?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui rencana kerja awal</button><button data-revise="'+esc(task.id)+'" class="secondary">Ubah rencana</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
 async function googleNotebookApi(path,options={}){
@@ -114,7 +114,7 @@ async function syncFinalWorkToNotebook(automatic=false){
 }
 function renderGoogleTools(){
   const tools=[
-    {name:"Pomelli",tag:"KONTEN & PEMASARAN",desc:"Dipakai melalui alur kerja karyawan pemasaran: Nadia menyiapkan brief, Fajar menjadi penanggung jawab visual, lalu brief disalin ke Pomelli. Hasil visual dikembalikan dan diperiksa manual karena belum ada API publik untuk otomasi penuh.",url:"https://labs.google.com/pomelli/about",status:"Alur kerja berbantuan karyawan",action:"Buka Pomelli"},
+    {name:"Pomelli",tag:"KONTEN & PEMASARAN",desc:"Alur pemasaran bertahap: Nadia menyusun strategi dan brief, Fajar menerjemahkannya menjadi arahan visual, lalu tim memakai Pomelli untuk membuat aset kampanye. Brief mengambil instruksi dan hasil kerja tim yang sudah tersimpan. Aset keluaran Pomelli diunggah kembali ke tugas ZORE AI untuk pemeriksaan manual; belum ada API publik untuk sinkronisasi otomatis.",url:"https://labs.google.com/pomelli/about",status:"Alur karyawan + serah-terima manual",action:"Buka Pomelli"},
     {name:"Stitch",tag:"DESAIN WEBSITE & UI",desc:"Rancang tampilan website dan prototipe. Hasil desain/kode dapat diekspor untuk diterapkan.",url:"https://stitch.withgoogle.com",status:"Bantuan manual",action:"Buka Stitch"},
     {name:"Gemini Notebook",tag:"RISET & DOKUMEN",desc:"API resmi untuk membuat notebook dan mengirim hasil kerja ZORE AI. Public Preview untuk akun Google pribadi.",url:"https://notebooklm.google.com",status:googleNotebookAccessToken?"Google terhubung untuk sesi ini":"Menunggu OAuth Google",action:"Buka Gemini Notebook"},
     {name:"Antigravity",tag:"PEMROGRAMAN AI",desc:"Bantu pengembangan kode melalui aplikasi komputer dan MCP lokal; tidak berjalan otomatis di browser ZORE AI.",url:"https://antigravity.google",status:"Aplikasi komputer",action:"Buka Antigravity"},
@@ -189,6 +189,52 @@ async function assignTask(event){
   event.currentTarget.reset();
   await syncOffice(true);showNotice("Tugas berhasil masuk antrean. Pantau tahap kerja dan hasil AI di bawah.","success");
 }
+function buildPomelliHandoffBrief(task){
+  const stages=task.chain_id?officeData.tasks.filter(item=>item.chain_id===task.chain_id).sort((a,b)=>Number(a.stage_order||0)-Number(b.stage_order||0)):[task];
+  const root=stages.find(item=>Number(item.stage_order||0)===0)||task;
+  const manager=stages.find(item=>Number(item.employee_idx)===1&&/pemeriksaan akhir|perencanaan|brief/i.test(item.title||""));
+  const visual=stages.find(item=>Number(item.employee_idx)===8);
+  const collect=(stage,label)=>{
+    if(!stage)return label+": belum ada tahap tersimpan.";
+    const reports=officeData.reports.filter(item=>String(item.task_id)===String(stage.id)).sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+    const results=resultRows.filter(item=>String(item.task_id)===String(stage.id)).sort((a,b)=>Number(b.version)-Number(a.version));
+    const parts=[];
+    if(reports[0]?.body)parts.push("Laporan terbaru: "+reports[0].body);
+    if(results[0]?.content)parts.push("Hasil kerja tersimpan (versi "+(results[0].version||1)+"): "+results[0].content);
+    return label+": "+(parts.join("\\n\\n")||"Tahap tersedia, tetapi belum ada laporan/hasil tersimpan.");
+  };
+  return [
+    "BRIEF KAMPANYE ZORE AI — SERAH TERIMA KE GOOGLE POMELLI",
+    "PERAN: Nadia Pratama (Manajer Kreatif) memimpin strategi, tujuan, audiens, pesan dan pemeriksaan. Fajar Nugroho (Desainer Grafis & Editor Video Senior) memimpin art direction, identitas visual dan spesifikasi aset.",
+    "",
+    "TUGAS ASLI: "+(root.title||task.title),
+    "INSTRUKSI PEMILIK: "+(root.instructions||task.instructions||"Tidak ada instruksi tambahan."),
+    "",
+    collect(manager,"MASUKAN NADIA / PERENCANAAN"),
+    "",
+    collect(visual,"MASUKAN FAJAR / ARAHAN VISUAL"),
+    "",
+    "INSTRUKSI POMELLI:",
+    "1. Susun konsep brand dan kampanye yang konsisten dengan brief, jangan menambah klaim produk yang tidak diberikan.",
+    "2. Buat beberapa variasi aset visual yang relevan dengan kanal publikasi dan target audiens.",
+    "3. Sertakan headline, caption, CTA, rekomendasi format/rasio, palet warna, tipografi, komposisi dan gaya visual.",
+    "4. Jaga konsistensi antar aset dan gunakan teks Bahasa Indonesia yang benar.",
+    "5. Pisahkan konsep, aset yang benar-benar berhasil dibuat, dan aset yang masih berupa rekomendasi. Jangan mengaku membuat file yang tidak tersedia.",
+    "",
+    "HASIL YANG HARUS DIKEMBALIKAN KE ZORE AI:",
+    "- File gambar/desain final dan variasinya.",
+    "- Caption, headline, CTA dan format publikasi.",
+    "- Catatan aset yang belum selesai atau perlu revisi.",
+    "- Unggah file dan catatan tersebut pada tugas pemasaran ZORE AI agar Nadia dapat memeriksa kesesuaian brief dan Fajar dapat melakukan revisi."
+  ].join("\\n");
+}
+async function copyPomelliBrief(value){
+  if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(value);return;}
+  const area=document.createElement("textarea");area.value=value;area.setAttribute("readonly","");
+  area.style.position="fixed";area.style.opacity="0";document.body.appendChild(area);area.select();
+  const copied=document.execCommand("copy");area.remove();
+  if(!copied)throw new Error("Clipboard tidak tersedia pada browser ini.");
+}
 async function handleWorkListClick(event){
   const target=event.target instanceof Element?event.target:null;
   if(!target)return;
@@ -212,10 +258,16 @@ async function handleWorkListClick(event){
   if(pomelliButton){
     const task=officeData.tasks.find(item=>String(item.id)===String(pomelliButton.dataset.pomelliTask));
     if(!task){showNotice("Tugas pemasaran tidak ditemukan. Perbarui daftar pekerjaan.","error");return;}
-    const prompt="ANDA ADALAH TIM KREATIF BRAND. Buat materi kampanye berdasarkan brief ZORE AI berikut. Hasilkan konsep brand, strategi kampanye, beberapa variasi aset/konten, arahan visual yang konsisten, headline, caption, CTA, dan rekomendasi format publikasi. Jangan mengubah fakta produk yang tidak diberikan.\n\nJUDUL TUGAS: "+task.title+"\n\nBRIEF DAN INSTRUKSI ZORE AI:\n"+(task.instructions||"Tidak ada instruksi tambahan.")+"\n\nSTANDAR HASIL: keluarkan materi yang siap ditinjau tim ZORE AI, jelaskan aset yang benar-benar berhasil dibuat, dan pisahkan ide dari file visual final.";
-    const popup=window.open("https://labs.google.com/pomelli/about","_blank","noopener,noreferrer");
-    try{await navigator.clipboard.writeText(prompt);showNotice(popup?"Brief Pomelli disalin. Tempelkan ke Pomelli, buat materi, lalu bawa hasilnya kembali ke tugas ZORE AI.":"Brief disalin, tetapi tab Pomelli mungkin diblokir browser. Buka Pomelli dari kartu Alat AI Google lalu tempelkan brief.","success");}
-    catch(error){showNotice("Clipboard tidak tersedia. Buka Pomelli dan gunakan instruksi tugas pada kartu untuk menyiapkan brief.","error");}
+    const prompt=buildPomelliHandoffBrief(task);
+    // Open Pomelli directly during the click gesture so the browser does not block the tab.
+    const popup=window.open("https://labs.google.com/pomelli/about","_blank");
+    try{
+      await copyPomelliBrief(prompt);
+      showNotice(popup?"Brief Nadia + arahan visual Fajar berhasil disalin. Tempelkan di Pomelli, buat aset, lalu unggah hasilnya kembali ke tugas ZORE AI untuk pemeriksaan.":"Brief berhasil disalin. Jika Pomelli tidak terbuka, buka dari kartu Alat AI Google lalu tempelkan brief.","success");
+    }catch(error){
+      if(popup)popup.close();
+      showNotice("Brief belum tersalin: "+(error?.message||"Clipboard tidak tersedia.")+". Coba salin ulang dari tugas.","error");
+    }
     return;
   }
   const videoButton=target.closest("[data-make-video]");
