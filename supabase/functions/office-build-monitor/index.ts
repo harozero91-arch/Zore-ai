@@ -56,17 +56,56 @@ async function monitorOne(build: any) {
   const errorMessage = status === 'failed' || status === 'cancelled'
     ? 'GitHub Actions ' + (run.conclusion || 'gagal') + (failedSteps.length ? ': ' + failedSteps.join('; ') : '. Buka log workflow untuk rincian.')
     : null;
+  let previewUrl: string | null = build.preview_url || null;
+  let previewLookupAttempts = Number(build.details?.preview_lookup_attempts || 0);
+  let previewLookupComplete = !!build.details?.preview_lookup_complete;
+  let artifactCommitSha: string | null = build.commit_sha || null;
+  if (status === 'passed' && build.branch && !previewUrl && !previewLookupComplete) {
+    previewLookupAttempts += 1;
+    try {
+      const refResponse = await fetch('https://api.github.com/repos/harozero91-arch/Zore-ai/git/ref/heads/' + encodeURIComponent(build.branch), {
+        headers: ghHeaders, signal: AbortSignal.timeout(8000),
+      });
+      if (refResponse.ok) {
+        const refData = await refResponse.json();
+        artifactCommitSha = refData.object?.sha || artifactCommitSha;
+      }
+      const deploymentsResponse = await fetch('https://api.github.com/repos/harozero91-arch/Zore-ai/deployments?ref=' + encodeURIComponent(build.branch) + '&per_page=5', {
+        headers: ghHeaders, signal: AbortSignal.timeout(8000),
+      });
+      if (deploymentsResponse.ok) {
+        const deployments = await deploymentsResponse.json();
+        for (const deployment of deployments || []) {
+          const statusResponse = await fetch('https://api.github.com/repos/harozero91-arch/Zore-ai/deployments/' + deployment.id + '/statuses?per_page=10', {
+            headers: ghHeaders, signal: AbortSignal.timeout(8000),
+          });
+          if (!statusResponse.ok) continue;
+          const statuses = await statusResponse.json();
+          const ready = (statuses || []).find((item:any) => item.state === 'success' && item.environment_url);
+          if (ready?.environment_url) {
+            previewUrl = new URL('/work-results/' + build.task_id + '/v' + build.version + '/build/index.html', ready.environment_url).toString();
+            break;
+          }
+        }
+      }
+    } catch (previewError) {
+      console.warn('Vercel preview lookup pending', previewError);
+    }
+    if (previewLookupAttempts >= 30) previewLookupComplete = true;
+  }
   const totalSteps = jobs.reduce((sum: number, job: any) => sum + job.steps.length, 0);
   const doneSteps = jobs.reduce((sum: number, job: any) => sum + job.steps.filter((step: any) => ['success','failure','cancelled','skipped'].includes(step.conclusion)).length, 0);
   const progress = totalSteps ? Math.round(doneSteps * 100 / totalSteps) : 0;
   const logUrl = run.html_url || build.log_url;
   const oldTerminal = ['passed','failed','cancelled'].includes(build.status);
   const update = {
-    github_run_id: Number(run.id), status, branch: run.head_branch || build.branch,
-    commit_sha: run.head_sha || build.commit_sha, log_url: logUrl, error_message: errorMessage,
+    github_run_id: Number(run.id), status, branch: build.branch,
+    commit_sha: artifactCommitSha || build.commit_sha || run.head_sha, preview_url:previewUrl,
+    log_url: logUrl, error_message: errorMessage,
     started_at: run.run_started_at || build.started_at,
     finished_at: run.status === 'completed' ? run.updated_at : null,
-    details: { ...(build.details || {}), jobs, progress_percent: progress, conclusion: run.conclusion, failed_steps: failedSteps },
+    details: { ...(build.details || {}), jobs, progress_percent: progress, conclusion: run.conclusion, failed_steps: failedSteps,
+      preview_lookup_attempts:previewLookupAttempts, preview_lookup_complete:previewLookupComplete },
     updated_at: new Date().toISOString(),
   };
   const { data: claimedUpdate, error: runError } = await admin.from('office_build_runs')
@@ -76,7 +115,7 @@ async function monitorOne(build: any) {
   if (!claimedUpdate) return { id: build.id, status: 'already_updated_by_another_monitor' };
   const { error: resultError } = await admin.from('office_task_results').update({
     build_status: status, build_run_id: Number(run.id), build_workflow_url: logUrl,
-    build_branch: run.head_branch || build.branch, build_commit_sha: run.head_sha || build.commit_sha,
+    build_branch: build.branch, build_commit_sha: build.commit_sha || run.head_sha,
     build_error: errorMessage, build_updated_at: new Date().toISOString(),
   }).eq('id', build.result_id).eq('owner_id', build.owner_id);
   if (resultError) throw resultError;
@@ -137,10 +176,10 @@ Deno.serve(async (req: Request) => {
     if (!githubToken) return reply({ error: 'GITHUB_ACTIONS_TOKEN belum dikonfigurasi' }, 503);
 
     const { data: builds, error } = await admin.from('office_build_runs')
-      .select('*').in('status', ['queued','in_progress']).order('created_at', { ascending: true }).limit(20);
+      .select('*').in('status', ['queued','in_progress','passed']).order('created_at', { ascending: true }).limit(50);
     if (error) throw error;
     const results = [];
-    for (const build of builds || []) {
+    for (const build of (builds || []).filter((item:any) => item.status !== 'passed' || (!item.preview_url && !item.details?.preview_lookup_complete)).slice(0,20)) {
       try { results.push(await monitorOne(build)); }
       catch (err) { results.push({ id: build.id, status: build.status, error: err instanceof Error ? err.message : String(err) }); }
     }
