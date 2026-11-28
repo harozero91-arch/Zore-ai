@@ -8,3 +8,16 @@
 6. Untuk aset default website setelah migrasi mesin utama disetujui, simpan model bernama zore-office.glb di public/models/ dan hubungkan pemuatan otomatis pada halaman utama.
 
 Pedoman: pisahkan objek statis kantor, furnitur bergerak, dan karakter ber-rig. Gunakan material PBR dan tekstur 2K untuk Android kelas menengah. Halaman Babylon masih preview terpisah; Three.js pada halaman utama serta sistem karyawan belum diganti oleh perubahan ini.
+
+
+## Menjalankan Blender tanpa komputer pribadi
+
+Notebook cloud tersedia di [Google Colab — ZORE AI Blender Worker](https://colab.research.google.com/github/harozero91-arch/Zore-ai/blob/main/cloud/blender_colab.ipynb).
+
+1. Buka tautan Colab dan login ke akun Google.
+2. Pilih **Runtime → Run all** (atau jalankan sel satu per satu dari atas).
+3. Izinkan Colab mengakses Google Drive agar file hasil tersimpan di folder `MyDrive/ZORE-AI/Blender`.
+4. Tunggu Blender terpasang dan contoh scene selesai dibuat.
+5. Periksa dua file: `zore-cloud-test.blend` dan `zore-cloud-test.glb`.
+
+**Batasan penting:** Colab gratis menyediakan sesi komputasi sementara, bukan server 24 jam. Notebook ini membuktikan Blender dapat dijalankan di cloud dan mengekspor aset; notebook ini belum mengambil antrean tugas karyawan, belum mengirim status otomatis ke ZORE AI, dan belum mengunggah hasil langsung ke Supabase. Jangan menaruh service-role key atau kredensial rahasia di notebook. Integrasi antrean otomatis adalah tahap lanjutan setelah jalur ekspor dasar diuji.
