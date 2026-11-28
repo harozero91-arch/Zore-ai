@@ -650,7 +650,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
     group.userData = {
       employee, body, head, eyes, eyelids, mouth, hands, elbows, arms, legs, target: new THREE.Vector3(staffX, 0.12, staffZ),
       speed: 1.25 + (i % 4) * 0.12, phase: i * 0.8, state: "walking",
-      bubble: null, bubbleUntil: 0, partner: null, seated: false, seat: null
+      bubble: null, bubbleUntil: 0, partner: null, seated: false, seat: null,
+      isSpeaking: false, speakingUntil: 0, gestureUntil: 0
     };
     scene.add(group); employeeObjects.push(group);
   });
@@ -937,6 +938,9 @@ export function mountZoreVirtualOffice(host, options = {}) {
     person.add(bubble);
     person.userData.bubble = bubble;
     person.userData.bubbleUntil = now + 5800;
+    person.userData.isSpeaking = true;
+    person.userData.speakingUntil = now + 3600;
+    person.userData.gestureUntil = now + 2600;
   }
 
   const raycaster = new THREE.Raycaster();
@@ -1210,13 +1214,25 @@ export function mountZoreVirtualOffice(host, options = {}) {
         const blink=blinkCycle>4.52?Math.sin((blinkCycle-4.52)/0.28*Math.PI):0;
         data.eyelids?.forEach(lid=>{lid.scale.y=0.02+blink*0.74;lid.position.y=1.67-blink*0.012;});
         data.eyes?.forEach((eye,index)=>{eye.position.y=1.67+Math.sin(now*0.0012+data.phase+index)*0.004;});
+        if(data.isSpeaking && now>data.speakingUntil)data.isSpeaking=false;
+        const talking=data.isSpeaking?Math.abs(Math.sin(now*0.018+data.phase))*0.9:0;
+        if(data.mouth){
+          data.mouth.scale.y=1+talking*1.7;
+          data.mouth.scale.x=1+talking*0.16;
+          data.mouth.position.y=1.525-talking*0.008;
+        }
         if(data.head && data.state!=="working"){
           data.head.rotation.y=Math.sin(now*0.0007+data.phase)*0.055;
-          data.head.rotation.x=Math.sin(now*0.0009+data.phase*1.3)*0.018;
+          data.head.rotation.x=Math.sin(now*0.0009+data.phase*1.3)*0.018+(data.isSpeaking?0.025:0);
         }
         if(!data.seated){
           data.legs.forEach((leg,index)=>{leg.rotation.x=moving?Math.sin(now*0.012+data.phase+index*Math.PI)*0.55:0;});
-          data.arms.forEach((arm,index)=>{arm.rotation.x=moving?-Math.sin(now*0.012+data.phase+index*Math.PI)*0.38:Math.sin(now*0.002+data.phase)*0.06;});
+          data.arms.forEach((arm,index)=>{
+            const walkSwing=moving?-Math.sin(now*0.012+data.phase+index*Math.PI)*0.38:Math.sin(now*0.002+data.phase)*0.06;
+            const talkGesture=data.isSpeaking?Math.sin(now*0.009+data.phase+index*Math.PI)*0.2:0;
+            arm.rotation.x=walkSwing+talkGesture;
+            arm.rotation.z=(index===0?0.18:-0.18)+(data.isSpeaking && index===0?-0.22:0);
+          });
         }else if(data.state==="working"){
           data.arms.forEach((arm,index)=>{
             arm.rotation.x=-0.45+Math.sin(now*0.012+data.phase+index*1.7)*0.12;
@@ -1224,7 +1240,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
           });
           data.head.rotation.x=0.08+Math.sin(now*0.003+data.phase)*0.025;
         }else{
-          data.arms.forEach((arm,index)=>{arm.rotation.z=(index===0?-0.12:0.12)+Math.sin(now*0.004+data.phase)*0.08;});
+          data.arms.forEach((arm,index)=>{
+            const gesture=data.isSpeaking && now<data.gestureUntil && index===0?0.3+Math.sin(now*0.012+data.phase)*0.12:0;
+            arm.rotation.z=(index===0?-0.12:0.12)+Math.sin(now*0.004+data.phase)*0.08+(index===0?gesture:0);
+            arm.rotation.x=data.isSpeaking?Math.sin(now*0.01+data.phase+index)*0.18:0;
+          });
         }
         if (data.bubble && now > data.bubbleUntil) {
           o.remove(data.bubble); data.bubble.material.map?.dispose(); data.bubble.material.dispose(); data.bubble = null;
