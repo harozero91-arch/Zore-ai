@@ -476,11 +476,118 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const darkMatLocal = material(0x29201c);
     const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 4, 10), bodyMat);
     body.position.y = 0.92; body.castShadow = true; group.add(body);
-    const head = new THREE.Mesh(new THREE.SphereGeometry(0.27, 20, 16), skinMat);
-    head.position.y = 1.62; head.castShadow = true; group.add(head);
-    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.275, 16, 10, 0, Math.PI*2, 0, Math.PI*0.55), darkMatLocal);
-    hair.position.y = 1.72; group.add(hair);
+    const visual = employee.visual || {};
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.29, 24, 18), skinMat);
+    head.scale.set(1.02, visual.headScale || 1.16, 0.94);
+    head.position.y = 1.65; head.castShadow = true; group.add(head);
+    const hairPalette = [0x29201c,0x30251f,0x211b19,0x3b2922,0x251d1b,0x3a2a22,0x29221e,0x2a2025,0x252329];
+    const hairMat = material(hairPalette[i] || 0x29201c, 0.82);
+    const hair = new THREE.Mesh(new THREE.SphereGeometry(0.292, 20, 14, 0, Math.PI*2, 0, Math.PI*0.58), hairMat);
+    hair.position.y = 1.76; hair.scale.set(1.02,1.0,1.02); group.add(hair);
+    // Distinct, repeatable hairstyles and silhouettes for each named employee.
+    const hairStyle = visual.hair || "classic";
+    if (["low-bun","long-ponytail"].includes(hairStyle)) {
+      const tail = new THREE.Mesh(new THREE.SphereGeometry(0.16,14,10),hairMat);
+      tail.scale.set(0.8,1.7,0.8); tail.position.set(0,1.53,-0.19); group.add(tail);
+      if (hairStyle==="low-bun") {
+        const bun = new THREE.Mesh(new THREE.SphereGeometry(0.13,14,10),hairMat);
+        bun.position.set(0,1.69,-0.28); group.add(bun);
+      }
+    } else if (hairStyle==="long-soft-wave") {
+      for (const side of [-1,1]) {
+        const lock = new THREE.Mesh(new THREE.CapsuleGeometry(0.075,0.28,4,8),hairMat);
+        lock.position.set(side*0.235,1.55,0.015); lock.rotation.z=side*-0.12; group.add(lock);
+      }
+    } else if (hairStyle==="short-spiky" || hairStyle==="textured-quiff" || hairStyle==="short-undercut") {
+      for (let k=0;k<3;k++) {
+        const tuft = new THREE.Mesh(new THREE.ConeGeometry(0.105,0.25,8),hairMat);
+        tuft.position.set((k-1)*0.12,1.99-(k===1?0.02:0.07),0.025);
+        tuft.rotation.z=(k-1)*-0.22; group.add(tuft);
+      }
+      if(hairStyle==="short-undercut"){
+        const sideFade=material(0x4b403a,0.9);
+        for(const side of [-1,1]){
+          const fade=new THREE.Mesh(new THREE.SphereGeometry(0.19,12,10),sideFade);
+          fade.scale.set(0.4,0.8,0.9);fade.position.set(side*0.23,1.68,0);group.add(fade);
+        }
+      }
+    } else {
+      const fringe = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,10),hairMat);
+      fringe.scale.set(1.0,0.5,0.55); fringe.position.set(0,1.84,0.205); group.add(fringe);
+    }
+    // Expressive eyes, brows, nose and a subtle smile make the face readable at office scale.
+    const eyeWhite = material(0xfff7e9,0.34);
     const eyeMat = material(0x241b17);
+    const browMat = hairMat;
+    for (const x of [-0.112, 0.112]) {
+      const white = new THREE.Mesh(new THREE.SphereGeometry(0.052,12,10),eyeWhite);
+      white.position.set(x,1.67,0.255); group.add(white);
+      const eye = new THREE.Mesh(new THREE.SphereGeometry(0.027,10,8),eyeMat);
+      eye.position.set(x,1.67,0.299); group.add(eye);
+      const brow = new THREE.Mesh(new THREE.BoxGeometry(0.095,0.018,0.025),browMat);
+      brow.position.set(x,1.755,0.25); brow.rotation.z=x<0?0.08:-0.08; group.add(brow);
+    }
+    const nose = new THREE.Mesh(new THREE.SphereGeometry(0.035,10,8),skinMat);
+    nose.scale.set(0.7,0.75,0.7);nose.position.set(0,1.59,0.285);group.add(nose);
+    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.052,0.009,6,14,Math.PI),material(0x8f5149));
+    mouth.position.set(0,1.535,0.274);mouth.rotation.z=Math.PI;group.add(mouth);
+    // Tailored clothing layers, lapels and a role-specific uniform silhouette.
+    const shirtMat = material(0xf1e9d8,0.72);
+    if (["navy-suit","navy-blazer","plum-professional"].includes(visual.wardrobe)) {
+      const shirt = new THREE.Mesh(new THREE.BoxGeometry(0.17,0.62,0.035),shirtMat);
+      shirt.position.set(0,0.98,0.305);group.add(shirt);
+      const lapelMat=material(0xd7c6a7,0.52);
+      for(const side of [-1,1]){
+        const lapel=new THREE.Mesh(new THREE.BoxGeometry(0.12,0.47,0.045),bodyMat);
+        lapel.position.set(side*0.12,1.02,0.3);lapel.rotation.z=side*0.22;group.add(lapel);
+      }
+      if(visual.wardrobe==="navy-suit"){
+        const tie=new THREE.Mesh(new THREE.ConeGeometry(0.055,0.34,4),goldMat);
+        tie.position.set(0,0.92,0.34);group.add(tie);
+      }
+    } else if (visual.wardrobe==="blue-techwear" || visual.wardrobe==="turquoise-hoodie") {
+      const seam=material(0xe1d4bd,0.55);
+      const zipper=new THREE.Mesh(new THREE.BoxGeometry(0.018,0.56,0.025),seam);
+      zipper.position.set(0,0.96,0.32);group.add(zipper);
+    }
+    const accessoryMat=material(employee.accent||0xc7a56a,0.42,0.12);
+    const shoesMat=material(0x272321,0.62);
+    for(const side of [-1,1]){
+      const shoe=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.34),shoesMat);
+      shoe.position.set(side*0.14,0.105,0.075);group.add(shoe);
+    }
+    // Each employee carries a recognizable profession-specific prop.
+    const propGroup=new THREE.Group();propGroup.position.set(0.43,0.92,0.18);group.add(propGroup);
+    const prop=visual.prop||"badge";
+    if(prop==="tablet"||prop==="laptop"){
+      const device=new THREE.Mesh(new THREE.BoxGeometry(prop==="laptop"?0.48:0.32,prop==="laptop"?0.3:0.42,0.045),material(0x273746,0.28,0.35));
+      device.rotation.z=-0.12;propGroup.add(device);
+      const screen=new THREE.Mesh(new THREE.BoxGeometry(prop==="laptop"?0.4:0.27,prop==="laptop"?0.24:0.34,0.008),material(0x56a9b9,0.24,0.18));
+      screen.position.z=0.028;propGroup.add(screen);
+    } else if(prop==="notebook"||prop==="sketchbook"){
+      const book=new THREE.Mesh(new THREE.BoxGeometry(0.28,0.38,0.055),material(prop==="notebook"?0x2e716e:0xc58b42,0.78));
+      book.rotation.z=-0.16;propGroup.add(book);
+      for(let k=0;k<3;k++){
+        const stroke=new THREE.Mesh(new THREE.BoxGeometry(0.16,0.012,0.008),shirtMat);
+        stroke.position.set(0,0.09-k*0.07,0.032);propGroup.add(stroke);
+      }
+    } else if(prop==="palette"){
+      const palette=new THREE.Mesh(new THREE.CircleGeometry(0.19,18),material(0xe6d8bd,0.82));
+      palette.scale.set(1.15,0.8,0.25);propGroup.add(palette);
+      [0xe7a35c,0x7c9a58,0x8a78b8,0x4b78a8].forEach((c,k)=>{
+        const dot=new THREE.Mesh(new THREE.SphereGeometry(0.035,8,6),material(c));
+        dot.position.set(-0.09+(k%2)*0.18,0.06-Math.floor(k/2)*0.12,0.045);propGroup.add(dot);
+      });
+    } else if(prop==="stylus"){
+      const pen=new THREE.Mesh(new THREE.CylinderGeometry(0.018,0.012,0.46,8),material(0x282c32,0.35,0.45));
+      pen.rotation.z=-0.24;propGroup.add(pen);
+    } else {
+      const folder=new THREE.Mesh(new THREE.BoxGeometry(0.32,0.4,0.05),accessoryMat);propGroup.add(folder);
+      const clasp=new THREE.Mesh(new THREE.BoxGeometry(0.08,0.035,0.02),goldMat);
+      clasp.position.set(0,0.1,0.04);propGroup.add(clasp);
+    }
+    const badge = new THREE.Mesh(new THREE.BoxGeometry(0.13,0.16,0.025),goldMat);
+    badge.position.set(-0.17,1.18,0.32);group.add(badge);
     for (const x of [-0.105, 0.105]) {
       const eye = new THREE.Mesh(new THREE.SphereGeometry(0.025, 8, 8), eyeMat);
       eye.position.set(x, 1.64, 0.245); group.add(eye);
