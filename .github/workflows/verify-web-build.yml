@@ -3,7 +3,7 @@ name: Verify ZORE AI website build
 on:
   workflow_dispatch:
   push:
-    branches: [main, 'fix/**', 'feat/**']
+    branches: [main, 'fix/**', 'feat/**', 'zore-artifact/**']
     paths:
       - "index.js"
       - "src/**"
@@ -11,7 +11,7 @@ on:
       - "vite.config.js"
       - "index.html"
       - "office.css"
-      - ".github/workflows/verify-web-build.yml"
+      - "public/**"\n      - ".github/workflows/**"
 
 jobs:
   build:
