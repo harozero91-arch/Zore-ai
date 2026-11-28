@@ -1,0 +1,25 @@
+name: ZORE AI 2D Animation Worker (Compatibility)
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_name:
+        description: "Nama tugas animasi 2D"
+        required: true
+        type: string
+      employee:
+        description: "Nama/jabatan karyawan"
+        required: true
+        default: "Dimas Kurniawan — AI 2D Animator"
+        type: string
+      animation_script:
+        description: "Kode Python Pillow untuk membuat frame animasi"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  animate:
+    uses: ./.github/workflows/employee-2d-animation-worker.yml
