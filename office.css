@@ -263,3 +263,15 @@
 .result-body pre{max-height:560px;overflow:auto;padding:14px;border-radius:9px;background:#111827;color:#e5e7eb;font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;white-space:pre;overflow-wrap:normal}
 .download-result{border:1px solid #9b825a!important}
 @media(max-width:600px){.team-progress-summary{align-items:flex-start;flex-direction:column;gap:5px}.result-body pre{max-height:420px;font-size:11px}}
+
+
+/* Visual refresh: crisp architectural render with warm-to-cool premium gradient. */
+.zore-office{background:linear-gradient(135deg,#172a36 0%,#4c5d63 34%,#b49b78 72%,#ead9b9 100%);border-color:#b89a68;box-shadow:0 22px 60px rgba(24,31,36,.24)}
+.zore-office__top{background:linear-gradient(112deg,#142b37 0%,#344d56 42%,#704b32 100%);border-bottom:1px solid rgba(238,207,153,.55)}
+.zore-office__viewport{background:radial-gradient(ellipse at 48% 35%,rgba(255,248,229,.96) 0%,rgba(220,207,181,.96) 35%,rgba(119,137,139,.98) 72%,#253d49 100%)}
+.zore-office__canvas,.zore-office__canvas canvas{image-rendering:auto}
+.zore-office__room-label{background:linear-gradient(110deg,rgba(20,43,55,.96),rgba(75,54,38,.94));box-shadow:0 5px 18px rgba(10,20,25,.22);text-shadow:0 1px 2px rgba(0,0,0,.3)}
+.zore-office__social-status{background:linear-gradient(110deg,rgba(22,57,48,.96),rgba(29,73,65,.92));box-shadow:0 5px 18px rgba(10,20,25,.2)}
+.zore-office__footer{background:linear-gradient(100deg,#203943,#55412e);color:#f0dfbf}
+.zore-office__top strong{color:#fff8e9;text-shadow:0 2px 12px rgba(0,0,0,.22)}
+@media(max-width:700px){.zore-office__viewport,.zore-office__canvas,.zore-office__canvas canvas{min-height:620px}}
