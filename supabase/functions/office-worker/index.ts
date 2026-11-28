@@ -363,9 +363,10 @@ async function processTask(t: Task, workerId: string, staff: Employee[]) {
     const prompt = (emp.idx === 1 && t.stage_order > 0 ? "INSTRUKSI PENGGABUNGAN AKHIR WAJIB: Sebagai manajer/pemeriksa akhir, jangan hanya menulis laporan bahwa pekerjaan sudah digabung. Periksa semua hasil tahap sebelumnya. Jika Fajar menyerahkan HTML lengkap, gunakan kode itu sebagai dasar dan keluarkan satu file HTML final yang utuh, mandiri, responsif, dengan CSS dan JavaScript tertanam bila diperlukan. Pertahankan fitur yang ada dan perbaiki bagian yang jelas rusak. Jangan bungkus kode dengan Markdown fence atau tambahkan laporan di luar kode. Jika bukan HTML, serahkan artefak akhir lengkap sesuai format tugas. Jika bahan tidak cukup, sebutkan kekurangannya dan jangan mengaku menghasilkan artefak.\n\n" : '') + `TUGAS TAHAP ${t.stage_order}: ${t.title}\nINSTRUKSI: ${t.instructions || '(tidak ada)'}\nCATATAN SERAH-TERIMA: Gunakan hasil di bawah sebagai input kerja wajib.\nHASIL TAHAP SEBELUMNYA:\n${previous.slice(0,16000)}\n` +
       (t.version > 1 ? `REVISI VERSI ${t.version}: ${t.revision_note || '(tanpa catatan)'}\n` : '');
     const out = parseOutput(await askGemini(system, prompt, emp));
+    let animationDispatch: any = null;
     if (emp.idx === 6 && /animasi 2d|2d animation|animasi karakter|kartun|frame[- ]by[- ]frame|motion graphic|motion graphics|gif|mp4 2d/i.test(t.title + ' ' + t.instructions) && !/blender|model(ing)? 3d|aset 3d|animasi 3d|glb|blend/i.test(t.title + ' ' + t.instructions)) {
-      const dispatched = await dispatch2DAnimationTask(t, emp, out.hasil);
-      out.hasil += '\n\nSTATUS EKSEKUSI ANIMASI 2D: Dimas telah membuat skrip animasi dan backend berhasil memicu GitHub Actions. Worker akan membuat frame PNG, MP4, GIF pratinjau, dan storyboard jika skrip berhasil. Hasil: ' + dispatched.workflow_url + '\nPanjang skrip: ' + dispatched.script_length + ' karakter. Audio hanya tersedia jika benar-benar dibuat oleh skrip.';
+      animationDispatch = await dispatch2DAnimationTask(t, emp, out.hasil);
+      out.hasil += '\n\nSTATUS EKSEKUSI ANIMASI 2D: Dimas telah membuat skrip animasi dan backend berhasil memicu GitHub Actions. Worker akan membuat frame PNG, MP4, GIF pratinjau, dan storyboard jika skrip berhasil. Hasil: ' + animationDispatch.workflow_url + '\nPanjang skrip: ' + animationDispatch.script_length + ' karakter. Audio hanya tersedia jika benar-benar dibuat oleh skrip.';
       out.laporan = [out.laporan, 'Skrip animasi 2D dibuat dan workflow otomatis berhasil dipicu.'].filter(Boolean).join(' ');
     }
     if (emp.idx === 6 && /blender|model(ing)? 3d|aset 3d|animasi 3d|glb|blend/i.test(t.title + ' ' + t.instructions)) {
@@ -418,6 +419,26 @@ async function processTask(t: Task, workerId: string, staff: Employee[]) {
         const version = savedResult?.version ?? t.version ?? 1;
         const resultId = savedResult?.id;
         if (!resultId) throw new Error('ID hasil pekerjaan tidak ditemukan setelah penyimpanan.');
+        if (animationDispatch) {
+          const animationBranch = 'zore-animation-' + t.id + '-v' + version;
+          const animationWorkflow = 'employee-2d-animation-worker.yml';
+          const { error: animationBuildError } = await db.from('office_build_runs').insert({
+            owner_id: t.owner_id, task_id: t.id, result_id: resultId, version,
+            workflow_name: animationWorkflow, github_run_id: null, status: 'queued',
+            branch: animationBranch, commit_sha: null, log_url: animationDispatch.workflow_url,
+            started_at: new Date().toISOString(), finished_at: null,
+            details: { employee: emp.name, production_type: '2D Pillow + FFmpeg + WAV SFX',
+              required_inputs: ['task_name','employee','animation_script'], dispatch_status: animationDispatch.dispatch_status,
+              preview_path: 'animation-preview.gif', export_paths: ['animation.mp4','animation-preview.gif','storyboard.png','sound.wav'] }
+          });
+          if (animationBuildError) throw animationBuildError;
+          const { error: animationResultError } = await db.from('office_task_results').update({
+            build_status: 'queued', build_run_id: null, build_workflow_url: animationDispatch.workflow_url,
+            build_branch: animationBranch, build_commit_sha: null, build_error: null,
+            build_updated_at: new Date().toISOString()
+          }).eq('id', resultId).eq('owner_id', t.owner_id);
+          if (animationResultError) throw animationResultError;
+        }
         const safeName = (t.title || 'hasil-pekerjaan').toLowerCase()
           .normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 70) || 'hasil-pekerjaan';
         const detected = detectArtifact(out.hasil, t.title || '');
