@@ -759,3 +759,12 @@ footer {
 .quick-task-buttons button:hover{background:#594126}
 #task-panel,#work-monitor,#google-tools,#organization,#zore-office-mount{scroll-margin-top:76px}
 @media(max-width:650px){.quick-task-helper{margin:10px 12px 24px;align-items:stretch;flex-direction:column}.quick-task-buttons{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.quick-task-buttons button{min-height:42px}.quick-nav{padding:9px 12px}.quick-actions a{flex:1 1 42%}}
+
+/* Tombol filter status pekerjaan */
+.work-stats{align-items:stretch}
+.work-stat-filter{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:5px;min-width:0;padding:14px;border:1px solid #6a5032;border-radius:10px;background:#17130f88;color:#b7a58b;text-align:left;cursor:pointer;transition:border-color .18s,background .18s,transform .18s}
+.work-stat-filter strong{font-size:24px;color:#f3d69d}
+.work-stat-filter span{font-size:10px;color:#b7a58b}
+.work-stat-filter:hover,.work-stat-filter.active{border-color:#d0a45d;background:#594126;transform:translateY(-1px)}
+.work-stat-filter.active span{color:#fff0d1}
+.work-stat-filter:focus-visible{outline:2px solid #e0bd77;outline-offset:3px}
