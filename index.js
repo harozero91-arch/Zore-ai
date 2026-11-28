@@ -105,8 +105,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const label = host.querySelector(".zore-office__room-label");
 
   const scene = new THREE.Scene();
-  scene.background = new THREE.Color(0xd8d0c1);
-  scene.fog = new THREE.Fog(0xd8d0c1, 105, 185);
+  scene.background = null; // Biarkan gradasi CSS terlihat melalui canvas transparan.
+  scene.fog = new THREE.Fog(0xc9c4bd, 105, 185);
   const isMobile = window.matchMedia?.("(max-width: 760px)").matches || /Android|iPhone|iPad/i.test(navigator.userAgent);
   const camera = new THREE.PerspectiveCamera(isMobile ? 52 : 46, 1, 0.1, 220);
   camera.position.set(34, 37, 39);
@@ -115,25 +115,26 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const deviceCores = navigator.hardwareConcurrency || 4;
   const qualityTier = !isMobile && deviceCores >= 8 ? "high" : deviceCores <= 4 ? "low" : "balanced";
   const renderer = new THREE.WebGLRenderer({
-    antialias: qualityTier !== "low", alpha: false, powerPreference: "high-performance"
+    antialias: true, alpha: true, powerPreference: "high-performance"
   });
   // Mobile-first quality defaults: render fewer pixels and avoid expensive shadow maps on phones.
   const initialPixelRatio = Math.min(window.devicePixelRatio || 1,
-    isMobile ? 0.95 : qualityTier === "high" ? 1.5 : qualityTier === "balanced" ? 1.25 : 1.0);
+    isMobile ? 1.2 : qualityTier === "high" ? 1.65 : qualityTier === "balanced" ? 1.4 : 1.1);
   renderer.setPixelRatio(initialPixelRatio);
+  renderer.setClearColor(0x000000, 0);
   const enableShadows = options.shadows !== false && !isMobile && qualityTier !== "low";
   renderer.shadowMap.enabled = enableShadows;
   renderer.shadowMap.type = THREE.PCFSoftShadowMap;
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 0.94;
+  renderer.toneMappingExposure = 1.12;
   canvasHost.appendChild(renderer.domElement);
 
   const pmremGenerator = new THREE.PMREMGenerator(renderer);
   const environmentRoom = new RoomEnvironment();
   const environmentTarget = pmremGenerator.fromScene(environmentRoom, 0.04);
   scene.environment = environmentTarget.texture;
-  scene.environmentIntensity = qualityTier === "high" ? 0.46 : 0.34;
+  scene.environmentIntensity = qualityTier === "high" ? 0.58 : 0.46;
   environmentRoom.dispose?.();
   pmremGenerator.dispose();
 
@@ -151,12 +152,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
   }
 
   // Layered architectural lighting: soft sky fill, warm key light and cool bounce.
-  const skyFill = new THREE.HemisphereLight(0xfff5e7, 0x46372d, 0.92);
+  const skyFill = new THREE.HemisphereLight(0xfff7ec, 0x514238, 1.12);
   scene.add(skyFill);
-  scene.add(new THREE.AmbientLight(0xfff4e8, 0.14));
-  const sun = new THREE.DirectionalLight(0xffe6c6, 1.35);
+  scene.add(new THREE.AmbientLight(0xfff5e9, 0.22));
+  const sun = new THREE.DirectionalLight(0xffe8cf, 1.65);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
-  const bounceLight = new THREE.DirectionalLight(0xc6ddff, 0.24);
+  const bounceLight = new THREE.DirectionalLight(0xc8e2ff, 0.32);
   bounceLight.position.set(25, 16, 8); scene.add(bounceLight);
   const warmFill = new THREE.PointLight(0xffd7a1, 8, 30, 1.8);
   warmFill.position.set(-11, 5.1, -3); scene.add(warmFill);
@@ -1394,8 +1395,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     if (minuteKey !== lastLightingMinute) {
       lastLightingMinute = minuteKey;
       const daylight = THREE.MathUtils.clamp(Math.sin(((hour + minute / 60) - 6) / 12 * Math.PI), 0, 1);
-      const sky = new THREE.Color(0x171d28).lerp(new THREE.Color(0xd8d0c1), daylight);
-      scene.background.copy(sky);
+      const sky = new THREE.Color(0x252b38).lerp(new THREE.Color(0xd8d0c1), daylight);
       scene.fog.color.copy(sky);
       sun.intensity = 0.12 + daylight * 1.18;
       chandelier.intensity = 27 - daylight * 13;
@@ -1432,7 +1432,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   let qualityFrameCount = 0;
   let adaptivePixelRatio = renderer.getPixelRatio();
   const maxPixelRatio = Math.min(window.devicePixelRatio || 1,
-    isMobile ? 1.0 : qualityTier === "high" ? 1.5 : qualityTier === "balanced" ? 1.25 : 1.0);
+    isMobile ? 1.2 : qualityTier === "high" ? 1.65 : qualityTier === "balanced" ? 1.4 : 1.1);
   let lastMobileRender = 0;
   const animate = () => {
     if (disposed) return;
@@ -1450,7 +1450,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       const sampleDuration = now - qualitySampleStart;
       if (sampleDuration >= 3000) {
         const fps = qualityFrameCount * 1000 / sampleDuration;
-        const targetRatio = fps < 22 ? 0.7 : fps < 26 ? 0.8 : fps < 29 ? 0.9 : fps > 31 ? maxPixelRatio : adaptivePixelRatio;
+        const targetRatio = fps < 20 ? 0.82 : fps < 24 ? 0.9 : fps < 28 ? 1.0 : fps > 31 ? maxPixelRatio : adaptivePixelRatio;
         if (Math.abs(targetRatio - adaptivePixelRatio) > 0.06) {
           adaptivePixelRatio = targetRatio;
           renderer.setPixelRatio(adaptivePixelRatio);
