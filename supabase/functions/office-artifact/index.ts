@@ -65,7 +65,7 @@ Deno.serve(async (req: Request) => {
       if (previewError) throw previewError;
       mainFile = {
         name: result.file_name, content_type: result.content_type, download_url: download.signedUrl,
-        preview_url: result.build_status === 'passed' && result.content_type?.startsWith('text/html') ? preview.signedUrl : null,
+        preview_url: result.build_status === 'passed' && (result.content_type?.startsWith('text/html') || result.content_type?.startsWith('image/') || result.content_type?.startsWith('video/') || result.content_type?.startsWith('audio/')) ? preview.signedUrl : null,
       };
     }
 
@@ -82,7 +82,7 @@ Deno.serve(async (req: Request) => {
         .createSignedUrl(row.storage_path, 900, { download: row.file_name });
       if (downloadError) throw downloadError;
       let previewUrl: string | null = null;
-      if (result.build_status === 'passed' && ['text/html','image/svg+xml'].includes(row.content_type)) {
+      if (result.build_status === 'passed' && (['text/html','image/svg+xml','image/png','image/jpeg','image/gif','image/webp','video/mp4','audio/wav'].includes(row.content_type))) {
         const { data: preview, error: previewError } = await admin.storage.from('zore-work-results')
           .createSignedUrl(row.storage_path, 900);
         if (previewError) throw previewError;
@@ -105,10 +105,18 @@ Deno.serve(async (req: Request) => {
       const { data: fileBlob, error: fileError } = await admin.storage.from('zore-work-results').download(result.storage_path);
       if (!fileError && fileBlob) validation = inspectSource(result.file_name, await fileBlob.text());
     }
+    const latestBuild: any = (builds || [])[0] || null;
+    const previewBase = latestBuild?.preview_url ? new URL('.', latestBuild.preview_url).toString() : null;
+    const mediaExports = previewBase ? {
+      preview_gif: new URL('animation-preview.gif', previewBase).toString(),
+      mp4: new URL('animation.mp4', previewBase).toString(),
+      storyboard: new URL('storyboard.png', previewBase).toString(),
+      audio: new URL('sound.wav', previewBase).toString(),
+    } : null;
     return reply({
       ok: true,
       task_id: taskId, version,
-      build: { status: result.build_status, error: result.build_error, workflow_url: result.build_workflow_url, branch: result.build_branch, commit_sha: result.build_commit_sha },
+      build: { status: result.build_status, error: result.build_error, workflow_url: result.build_workflow_url, branch: result.build_branch, commit_sha: result.build_commit_sha, preview_url: latestBuild?.preview_url ?? null, media_exports: mediaExports },
       file: mainFile,
       validation,
       artifacts,
