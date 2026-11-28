@@ -166,6 +166,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const marbleTexture = createSurfaceTexture("marble", "#e9e3d7", 3, 2, maxAnisotropy);
   const woodTexture = createSurfaceTexture("wood", "#70452e", 2, 2, maxAnisotropy);
   const fabricTexture = createSurfaceTexture("fabric", "#315d78", 7, 7, maxAnisotropy);
+  const apparelTexture = createSurfaceTexture("fabric", "#eee9df", 5, 5, maxAnisotropy);
   const marbleMaterial = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, map: marbleTexture.map, bumpMap: marbleTexture.bumpMap,
     bumpScale: 0.018, roughness: 0.28, metalness: 0.035,
@@ -666,8 +667,17 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const [staffX, staffZ] = staffSpots[i] || [0,0];
     group.position.set(staffX, 0.12, staffZ);
     const outfitColor = employee.accent || (i % 2 ? "#345c50" : "#70513a");
-    const bodyMat = material(new THREE.Color(outfitColor), 0.58, 0.04);
-    const skinMat = material(i % 3 === 0 ? 0xd5a17d : i % 3 === 1 ? 0xc99570 : 0xe0b18e);
+    const bodyMat = new THREE.MeshPhysicalMaterial({
+      color: new THREE.Color(outfitColor), map: apparelTexture.map,
+      bumpMap: apparelTexture.bumpMap, bumpScale: 0.009,
+      roughness: 0.82, metalness: 0.0, clearcoat: 0.035,
+      clearcoatRoughness: 0.9, envMapIntensity: 0.38
+    });
+    const skinMat = new THREE.MeshPhysicalMaterial({
+      color: i % 3 === 0 ? 0xd5a17d : i % 3 === 1 ? 0xc99570 : 0xe0b18e,
+      roughness: 0.68, metalness: 0.0, clearcoat: 0.055,
+      clearcoatRoughness: 0.72, envMapIntensity: 0.48
+    });
     const darkMatLocal = material(0x29201c);
     // Sculpted torso silhouette: broad shoulders, natural chest, tapered waist and hips.
     const torsoProfile = [
@@ -706,7 +716,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
       innerEar.scale.set(0.5,0.9,0.4); innerEar.position.set(side*0.292,1.62,0.045); group.add(innerEar);
     }
     const hairPalette = [0x29201c,0x30251f,0x211b19,0x3b2922,0x251d1b,0x3a2a22,0x29221e,0x2a2025,0x252329];
-    const hairMat = material(hairPalette[i] || 0x29201c, 0.76);
+    const hairMat = new THREE.MeshPhysicalMaterial({
+      color: hairPalette[i] || 0x29201c, roughness: 0.7,
+      metalness: 0.0, clearcoat: 0.12, clearcoatRoughness: 0.58,
+      sheen: 0.18, sheenRoughness: 0.82, envMapIntensity: 0.42
+    });
     const hair = new THREE.Mesh(new THREE.SphereGeometry(0.292, 28, 20, 0, Math.PI*2, 0, Math.PI*0.61), hairMat);
     hair.position.y = 1.76; hair.scale.set(1.04,1.02,1.02); hair.castShadow=true; group.add(hair);
     // Distinct, repeatable hairstyles and silhouettes for each named employee.
@@ -1503,6 +1517,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       marbleTexture.map.dispose(); marbleTexture.bumpMap.dispose();
       woodTexture.map.dispose(); woodTexture.bumpMap.dispose();
       fabricTexture.map.dispose(); fabricTexture.bumpMap.dispose();
+      apparelTexture.map.dispose(); apparelTexture.bumpMap.dispose();
       host.innerHTML = ""; host.classList.remove("zore-office");
     }
   };
