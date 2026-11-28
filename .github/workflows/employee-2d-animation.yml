@@ -2,9 +2,6 @@ name: ZORE AI 2D Animation
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
     inputs:
       task_name:
         description: "Nama tugas animasi 2D"
@@ -19,6 +16,10 @@ on:
         description: "Kode Python Pillow untuk membuat frame animasi"
         required: true
         type: string
+
+  push:
+    branches:
+      - main
 
 permissions:
   contents: read
