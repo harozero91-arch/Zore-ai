@@ -10,7 +10,7 @@ const app=document.querySelector("#app");
 const OWNER_EMAIL="rendareza83@gmail.com";
 
 let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
-let googleNotebookAccessToken=null;
+let googleNotebookAccessToken=null, notebookAutoSyncPaused=false;
 supabase?.auth.onAuthStateChange((event,session)=>{if(session?.provider_token)googleNotebookAccessToken=session.provider_token;if(event==="SIGNED_OUT")googleNotebookAccessToken=null;});
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>v?new Date(v).toLocaleString("id-ID",{dateStyle:"short",timeStyle:"short"}):"—";
@@ -85,7 +85,8 @@ async function connectGoogleNotebook(){
   const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{scopes:"https://www.googleapis.com/auth/notebook",redirectTo:window.location.origin,queryParams:{access_type:"offline",prompt:"consent"}}});
   if(error)showNotice("Koneksi Google gagal: "+error.message,"error");
 }
-async function syncFinalWorkToNotebook(){
+async function syncFinalWorkToNotebook(automatic=false){
+  if(automatic&&(!googleNotebookAccessToken||notebookAutoSyncPaused))return;
   const button=document.querySelector("#notebook-sync");
   if(button){button.disabled=true;button.textContent="Mengirim hasil…";}
   try{
@@ -95,13 +96,18 @@ async function syncFinalWorkToNotebook(){
     if(!task)throw new Error("Belum ada hasil akhir gabungan yang sudah diserahkan. Selesaikan satu alur kerja karyawan terlebih dahulu.");
     const result=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version))[0];
     if(!result?.content)throw new Error("Hasil akhir gabungan belum ditemukan di penyimpanan.");
+    const syncedIds=JSON.parse(localStorage.getItem("zoreNotebookSyncedResultIds")||"[]");
+    if(syncedIds.includes(String(result.id))){if(!automatic)showNotice("Hasil gabungan ini sudah tersinkron ke Gemini Notebook.","success");return;}
     const list=await googleNotebookApi("/notebooks");
     let notebook=(list.notebooks||[]).find(n=>(n.display_name||n.displayName)==="ZORE AI — Pusat Riset dan Hasil Kerja");
     if(!notebook)notebook=await googleNotebookApi("/notebooks",{method:"POST",body:JSON.stringify({display_name:"ZORE AI — Pusat Riset dan Hasil Kerja"})});
     const content="# "+(task.title||"Hasil gabungan ZORE AI")+"\n\nStatus: "+task.status+"\n\n"+result.content.slice(0,950000);
     const source=await googleNotebookApi("/"+notebook.name+"/sources",{method:"POST",body:JSON.stringify({display_name:"Hasil gabungan ZORE AI — "+(task.title||"Tugas final")+" — "+new Date().toLocaleDateString("id-ID"),mime_type:"text/markdown",text_content:{content}})});
-    showNotice("Berhasil mengirim hasil gabungan ke Gemini Notebook. Status sumber: "+(source.state||"diproses")+".","success");
-  }catch(error){showNotice("Sinkronisasi Notebook belum berhasil: "+(error?.message||error),"error");}
+    syncedIds.push(String(result.id));
+    localStorage.setItem("zoreNotebookSyncedResultIds",JSON.stringify(syncedIds.slice(-100)));
+    notebookAutoSyncPaused=false;
+    if(!automatic)showNotice("Berhasil mengirim hasil gabungan ke Gemini Notebook. Status sumber: "+(source.state||"diproses")+".","success");
+  }catch(error){if(automatic){notebookAutoSyncPaused=true;console.warn("ZORE Notebook auto-sync paused:",error);}else showNotice("Sinkronisasi Notebook belum berhasil: "+(error?.message||error),"error");}
   finally{if(button){button.disabled=false;button.textContent="Kirim hasil gabungan terakhir ke Notebook";}}
 }
 function renderGoogleTools(){
@@ -138,6 +144,7 @@ async function syncOffice(redraw=false){
   const ids=officeData.tasks.map(t=>t.id).filter(Boolean);
   if(ids.length){const {data:rows,error:resultError}=await supabase.from("office_task_results").select("id,task_id,version,content,model,created_at,storage_path,file_name,content_type").in("task_id",ids).order("version",{ascending:false});if(!resultError)resultRows=rows||[];}
   else resultRows=[];
+  if(googleNotebookAccessToken&&!notebookAutoSyncPaused)void syncFinalWorkToNotebook(true);
   if(redraw)renderWorkspace();
   else {
     const monitor=document.querySelector(".work-monitor");
