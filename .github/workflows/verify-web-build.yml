@@ -11,7 +11,8 @@ on:
       - "vite.config.js"
       - "index.html"
       - "office.css"
-      - "public/**"\n      - ".github/workflows/**"
+      - "public/**"
+      - ".github/workflows/**"
 
 jobs:
   build:
