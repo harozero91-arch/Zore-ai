@@ -205,6 +205,44 @@ export function mountZoreVirtualOffice(host, options = {}) {
   box(building, -20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
   box(building, 20.78, 0.34, 0, 0.12, 0.22, 29.5, goldMat, false);
 
+  // Modern-classic architectural detailing: fluted pilasters, framed wall panels,
+  // layered cornices and champagne-metal reveals. The roof remains intentionally open.
+  const trimIvory = material(0xf0e8d8, 0.48, 0.025);
+  const shadowWalnut = material(0x3b261d, 0.52, 0.08);
+  const brassSoft = material(0xb9955e, 0.3, 0.68);
+  function addPilaster(x, z, alongSide = false) {
+    const column = new THREE.Group();
+    column.position.set(x, 0, z);
+    building.add(column);
+    const shaft = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.25, 5.55, 20, 1), trimIvory);
+    shaft.position.y = 3.05;
+    shaft.castShadow = true; shaft.receiveShadow = true; column.add(shaft);
+    for (const [y, radius, height] of [[0.48,0.39,0.18],[0.62,0.31,0.12],[5.78,0.34,0.16],[5.94,0.43,0.18]]) {
+      const ring = new THREE.Mesh(new THREE.CylinderGeometry(radius,radius,height,20), brassSoft);
+      ring.position.y = y; ring.castShadow = true; column.add(ring);
+    }
+    const capital = new THREE.Mesh(new THREE.BoxGeometry(0.82,0.2,0.62), trimIvory);
+    capital.position.y = 6.08; capital.castShadow = true; column.add(capital);
+    if (alongSide) column.rotation.y = Math.PI / 2;
+  }
+  [-18,-7,7,18].forEach(x=>addPilaster(x,-14.35));
+  [-9,1,11].forEach(z=>{addPilaster(-20.35,z,true);addPilaster(20.35,z,true);});
+
+  // Recessed-looking wall panels and continuous crown molding add depth to the rear elevation.
+  for (const x of [-13.1,-4.35,4.35,13.1]) {
+    box(building,x,2.9,-14.79,7.55,4.65,0.055,shadowWalnut,false);
+    box(building,x,2.9,-14.70,7.28,4.38,0.06,trimIvory,false);
+    box(building,x,2.9,-14.64,6.98,4.08,0.035,wallMat,false);
+    for (const dx of [-3.42,3.42]) box(building,x+dx,2.9,-14.59,0.045,3.85,0.035,brassSoft,false);
+    for (const y of [0.99,4.81]) box(building,x,y,-14.59,6.86,0.045,0.035,brassSoft,false);
+  }
+  box(building,0,6.12,-14.55,41.5,0.18,0.42,trimIvory,false);
+  box(building,0,6.23,-14.31,41.5,0.08,0.12,brassSoft,false);
+  for (const sideX of [-20.38,20.38]) {
+    box(building,sideX,6.12,0,0.42,0.18,29.3,trimIvory,false);
+    box(building,sideX+(sideX<0?0.12:-0.12),6.23,0,0.12,0.08,29.3,brassSoft,false);
+  }
+
   const glassMat = new THREE.MeshPhysicalMaterial({
     color: 0xb9d8d2, transparent: true, opacity: 0.28,
     roughness: 0.12, metalness: 0.06, transmission: 0.18,
@@ -419,6 +457,28 @@ export function mountZoreVirtualOffice(host, options = {}) {
   // Warm architectural lighting.
   const pendant = new THREE.PointLight(0xffd69a, 28, 28);
   pendant.position.set(0,5.8,-5); scene.add(pendant);
+
+  // A visible sculptural brass chandelier over the meeting table (no ceiling mesh).
+  const chandelierRig = new THREE.Group();
+  chandelierRig.position.set(0,5.75,1);
+  building.add(chandelierRig);
+  const chandelierRing = new THREE.Mesh(new THREE.TorusGeometry(1.55,0.055,12,64),brassSoft);
+  chandelierRing.rotation.x=Math.PI/2; chandelierRig.add(chandelierRing);
+  const innerRing = new THREE.Mesh(new THREE.TorusGeometry(0.92,0.035,10,48),goldMat);
+  innerRing.rotation.x=Math.PI/2; chandelierRig.add(innerRing);
+  for(let i=0;i<8;i++){
+    const a=i*Math.PI/4;
+    const drop=new THREE.Mesh(new THREE.CylinderGeometry(0.025,0.025,0.72,8),brassSoft);
+    drop.position.set(Math.cos(a)*1.55,-0.42,Math.sin(a)*1.55);chandelierRig.add(drop);
+    const bulb=new THREE.Mesh(new THREE.SphereGeometry(0.12,14,10),
+      new THREE.MeshBasicMaterial({color:0xffe1a5}));
+    bulb.position.set(Math.cos(a)*1.55,-0.82,Math.sin(a)*1.55);chandelierRig.add(bulb);
+  }
+  const centerStem=new THREE.Mesh(new THREE.CylinderGeometry(0.035,0.035,0.85,10),brassSoft);
+  centerStem.position.y=-0.42;chandelierRig.add(centerStem);
+  const chandelierCap=new THREE.Mesh(new THREE.SphereGeometry(0.2,16,12),goldMat);
+  chandelierCap.position.y=-0.9;chandelierRig.add(chandelierCap);
+
   const entranceLight = new THREE.PointLight(0xffe2b4, 18, 20);
   entranceLight.position.set(-14,4,10); scene.add(entranceLight);
 
