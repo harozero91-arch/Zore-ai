@@ -3,6 +3,8 @@ import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
 import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
 import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
 import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { SSAOPass } from "three/addons/postprocessing/SSAOPass.js";
+import { OutputPass } from "three/addons/postprocessing/OutputPass.js";
 import { RoundedBoxGeometry } from "three/addons/geometries/RoundedBoxGeometry.js";
 
 const OFFICE = { name: "Kantor Terpadu", x: 0, z: 0, w: 42, d: 30 };
@@ -32,6 +34,19 @@ function createSurfaceTexture(kind, baseColor, repeatX = 2, repeatY = 2, maxAnis
     for (let i = 0; i < 900; i++) {
       ctx.fillStyle = i % 2 ? "rgba(90,75,60,0.035)" : "rgba(255,255,255,0.06)";
       ctx.fillRect((i * 97) % 512, (i * 193) % 512, 2, 2);
+    }
+  } else if (kind === "fabric") {
+    // Fine woven threads create a subtle textile response under grazing light.
+    for (let i = 0; i < 512; i += 4) {
+      ctx.strokeStyle = i % 8 === 0 ? "rgba(255,255,255,0.12)" : "rgba(12,20,24,0.10)";
+      ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(i, 0); ctx.lineTo(i, 512); ctx.stroke();
+      ctx.strokeStyle = i % 8 === 0 ? "rgba(255,255,255,0.09)" : "rgba(12,20,24,0.08)";
+      ctx.beginPath(); ctx.moveTo(0, i); ctx.lineTo(512, i); ctx.stroke();
+    }
+    for (let i = 0; i < 1800; i++) {
+      ctx.fillStyle = i % 2 ? "rgba(255,255,255,0.035)" : "rgba(0,0,0,0.035)";
+      ctx.fillRect((i * 97) % 512, (i * 193) % 512, 1, 1);
     }
   } else {
     for (let i = 0; i < 46; i++) {
@@ -122,7 +137,13 @@ export function mountZoreVirtualOffice(host, options = {}) {
   if (qualityTier === "high" && !isMobile) {
     composer = new EffectComposer(renderer);
     composer.addPass(new RenderPass(scene, camera));
-    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.13, 0.28, 0.88));
+    const ssaoPass = new SSAOPass(scene, camera, 1, 1);
+    ssaoPass.kernelRadius = 12;
+    ssaoPass.minDistance = 0.004;
+    ssaoPass.maxDistance = 0.12;
+    composer.addPass(ssaoPass);
+    composer.addPass(new UnrealBloomPass(new THREE.Vector2(1, 1), 0.11, 0.24, 0.9));
+    composer.addPass(new OutputPass());
   }
 
   scene.add(new THREE.HemisphereLight(0xfff4df, 0x594536, 1.3));
@@ -130,7 +151,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const sun = new THREE.DirectionalLight(0xffe8c9, 2.25);
   sun.position.set(-22, 35, 18); sun.castShadow = renderer.shadowMap.enabled;
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
-  sun.shadow.mapSize.set(isMobile ? 1536 : shadowResolution === 2048 ? 3072 : 2048, isMobile ? 1536 : shadowResolution === 2048 ? 3072 : 2048);
+  const shadowSize = isMobile ? 1024 : shadowResolution === 2048 ? 3072 : 2048;
+  sun.shadow.mapSize.set(shadowSize, shadowSize);
   sun.shadow.camera.left = -28; sun.shadow.camera.right = 28;
   sun.shadow.camera.top = 24; sun.shadow.camera.bottom = -24;
   sun.shadow.camera.near = 1; sun.shadow.camera.far = 90;
@@ -143,6 +165,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const maxAnisotropy = Math.min(renderer.capabilities.getMaxAnisotropy(), qualityTier === "high" ? 8 : 4);
   const marbleTexture = createSurfaceTexture("marble", "#e9e3d7", 3, 2, maxAnisotropy);
   const woodTexture = createSurfaceTexture("wood", "#70452e", 2, 2, maxAnisotropy);
+  const fabricTexture = createSurfaceTexture("fabric", "#315d78", 7, 7, maxAnisotropy);
   const marbleMaterial = new THREE.MeshPhysicalMaterial({
     color: 0xffffff, map: marbleTexture.map, bumpMap: marbleTexture.bumpMap,
     bumpScale: 0.018, roughness: 0.28, metalness: 0.035,
@@ -275,7 +298,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const deskEdge = material(0x70452e, 0.48);
   const screenMat = material(0x172b3a, 0.22, 0.25);
   const screenGlow = material(0x39a6c3, 0.28, 0.2);
-  const chairMat = material(0x315d78, 0.58);
+  const chairMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: fabricTexture.map, bumpMap: fabricTexture.bumpMap,
+    bumpScale: 0.012, roughness: 0.88, metalness: 0.0,
+    clearcoat: 0.025, clearcoatRoughness: 0.95, envMapIntensity: 0.42
+  });
   const plantLeaf = material(0x39764c, 0.78);
   const potMat = material(0xd6c7ad, 0.8);
 
@@ -361,7 +388,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
   // Lounge area in the front-right corner: sofa, coffee table and carpet.
   const loungeRug = new THREE.Mesh(new THREE.CircleGeometry(5.2, 40), material(0x2b6070, 0.95));
   loungeRug.rotation.x = -Math.PI / 2; loungeRug.position.set(12.0, 0.24, 10.0); building.add(loungeRug);
-  const sofaMat = material(0x294d69, 0.72);
+  const sofaMat = new THREE.MeshPhysicalMaterial({
+    color: 0xffffff, map: fabricTexture.map, bumpMap: fabricTexture.bumpMap,
+    bumpScale: 0.016, roughness: 0.91, metalness: 0.0,
+    clearcoat: 0.015, clearcoatRoughness: 0.98, envMapIntensity: 0.38
+  });
   box(building, 12, 0.72, 12.4, 8.2, 0.55, 1.25, sofaMat);
   box(building, 12, 1.25, 13.0, 8.2, 1.05, 0.38, sofaMat);
   box(building, 7.95, 0.95, 11.2, 0.42, 1.0, 2.8, sofaMat);
@@ -1297,10 +1328,29 @@ export function mountZoreVirtualOffice(host, options = {}) {
   const syncInterval = setInterval(syncServerClock, 60000);
 
   let frame = 0, disposed = false;
+  let qualitySampleStart = performance.now();
+  let qualityFrameCount = 0;
+  let adaptivePixelRatio = renderer.getPixelRatio();
+  const maxPixelRatio = Math.min(window.devicePixelRatio || 1, isMobile ? 1.35 : qualityTier === "high" ? 1.85 : 1.55);
   const animate = () => {
     if (disposed) return;
     frame = requestAnimationFrame(animate);
     const now = performance.now();
+    if (isMobile) {
+      qualityFrameCount++;
+      const sampleDuration = now - qualitySampleStart;
+      if (sampleDuration >= 3000) {
+        const fps = qualityFrameCount * 1000 / sampleDuration;
+        const targetRatio = fps < 38 ? 0.9 : fps < 47 ? 1.0 : fps > 56 ? maxPixelRatio : adaptivePixelRatio;
+        if (Math.abs(targetRatio - adaptivePixelRatio) > 0.06) {
+          adaptivePixelRatio = targetRatio;
+          renderer.setPixelRatio(adaptivePixelRatio);
+          renderer.setSize(Math.max(1,canvasHost.clientWidth),Math.max(1,canvasHost.clientHeight),false);
+        }
+        qualityFrameCount = 0;
+        qualitySampleStart = now;
+      }
+    }
     if (!reducedMotion) {
       if(!meetingState.active && now>=meetingState.nextAt)startTeamMeeting(now);
       updateTeamMeeting(now);
@@ -1452,6 +1502,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
       environmentTarget.dispose();
       marbleTexture.map.dispose(); marbleTexture.bumpMap.dispose();
       woodTexture.map.dispose(); woodTexture.bumpMap.dispose();
+      fabricTexture.map.dispose(); fabricTexture.bumpMap.dispose();
       host.innerHTML = ""; host.classList.remove("zore-office");
     }
   };
