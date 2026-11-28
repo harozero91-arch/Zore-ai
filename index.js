@@ -474,8 +474,22 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const bodyMat = material(new THREE.Color(outfitColor), 0.58, 0.04);
     const skinMat = material(i % 3 === 0 ? 0xd5a17d : i % 3 === 1 ? 0xc99570 : 0xe0b18e);
     const darkMatLocal = material(0x29201c);
-    const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.34, 0.68, 4, 10), bodyMat);
-    body.position.y = 0.92; body.castShadow = true; group.add(body);
+    // Sculpted torso silhouette: broad shoulders, natural chest, tapered waist and hips.
+    const torsoProfile = [
+      new THREE.Vector2(0.16,-0.66), new THREE.Vector2(0.22,-0.61),
+      new THREE.Vector2(0.265,-0.48), new THREE.Vector2(0.235,-0.27),
+      new THREE.Vector2(0.245,-0.08), new THREE.Vector2(0.29,0.16),
+      new THREE.Vector2(0.35,0.39), new THREE.Vector2(0.315,0.55),
+      new THREE.Vector2(0.22,0.68)
+    ];
+    const body = new THREE.Mesh(new THREE.LatheGeometry(torsoProfile, 32), bodyMat);
+    const bodyBuilds = [
+      [1.02,1.00,1.00],[1.00,1.00,0.98],[0.98,1.00,0.98],
+      [0.98,1.00,0.98],[1.06,1.00,1.02],[1.00,1.00,1.00],
+      [1.04,1.00,1.02],[0.98,1.00,0.98],[1.02,1.00,1.00]
+    ];
+    body.scale.set(...(bodyBuilds[i] || [1,1,1]));
+    body.position.y = 0.92; body.castShadow = true; body.receiveShadow = true; group.add(body);
     const visual = employee.visual || {};
     const faceGeometry = new THREE.SphereGeometry(0.29, 32, 24);
     const faceShapes = {
@@ -582,7 +596,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const accessoryMat=material(employee.accent||0xc7a56a,0.42,0.12);
     const shoesMat=material(0x272321,0.62);
     for(const side of [-1,1]){
-      const shoe=new THREE.Mesh(new THREE.BoxGeometry(0.22,0.12,0.34),shoesMat);
+      const shoe=new THREE.Mesh(new THREE.BoxGeometry(0.24,0.14,0.38),shoesMat);
       shoe.position.set(side*0.14,0.105,0.075);group.add(shoe);
     }
     // Each employee carries a recognizable profession-specific prop.
@@ -621,10 +635,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
     for (const side of [-1, 1]) {
       const shoulder = new THREE.Mesh(new THREE.SphereGeometry(0.13,14,10),bodyMat);
       shoulder.position.set(side*0.34,1.18,0); group.add(shoulder);
-      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.082,0.38,5,12),bodyMat);
-      arm.position.set(side*0.39,0.95,0); arm.rotation.z=side*-0.18; group.add(arm); arms.push(arm);
-      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.075,12,8),bodyMat);
-      elbow.position.set(side*0.43,0.69,0.015); group.add(elbow); elbows.push(elbow);
+      const arm = new THREE.Mesh(new THREE.CapsuleGeometry(0.092,0.54,6,14),bodyMat);
+      arm.position.set(side*0.39,0.95,0); arm.rotation.z=side*-0.16; arm.castShadow=true; group.add(arm); arms.push(arm);
+      const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.078,16,12),bodyMat);
+      elbow.position.set(side*0.43,0.72,0.015); group.add(elbow); elbows.push(elbow);
       const hand = new THREE.Mesh(new THREE.SphereGeometry(0.085,14,10),skinMat);
       hand.scale.set(0.78,0.72,0.9); hand.position.set(side*0.43,0.55,0.035); group.add(hand); hands.push(hand);
       for(let finger=0;finger<3;finger++){
@@ -634,7 +648,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     }
     const legs = [];
     for (const side of [-1, 1]) {
-      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.105, 0.36, 3, 8), darkMatLocal);
+      const leg = new THREE.Mesh(new THREE.CapsuleGeometry(0.122, 0.42, 5, 12), darkMatLocal);
       leg.position.set(side * 0.14, 0.35, 0); group.add(leg); legs.push(leg);
     }
     const marker = new THREE.Mesh(new THREE.SphereGeometry(0.075, 10, 8), goldMat);
