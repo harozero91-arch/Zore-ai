@@ -355,15 +355,30 @@ export function mountZoreVirtualOffice(host, options = {}) {
   // Central round meeting table, chairs, laptops and presentation display.
   const meeting = new THREE.Group(); meeting.position.set(0, 0, 1.0); building.add(meeting);
   cylinder(meeting, 0, 0.92, 0, 2.65, 2.65, 0.2, deskTop);
+  // Thin brass reveal around the polished tabletop and a dark inset foot plinth.
+  const tableRim = new THREE.Mesh(new THREE.TorusGeometry(2.57, 0.035, 10, 72), goldMat);
+  tableRim.rotation.x = Math.PI / 2; tableRim.position.y = 1.015; tableRim.castShadow = true; meeting.add(tableRim);
+  const tableInlay = new THREE.Mesh(new THREE.TorusGeometry(2.22, 0.012, 8, 72), brassSoft);
+  tableInlay.rotation.x = Math.PI / 2; tableInlay.position.y = 1.025; meeting.add(tableInlay);
   cylinder(meeting, 0, 0.48, 0, 0.34, 0.5, 0.75, woodMat);
   cylinder(meeting, 0, 0.34, 0, 1.05, 1.05, 0.12, deskEdge);
   for (let i = 0; i < 8; i++) {
     const a = i * Math.PI / 4;
     const seat = new THREE.Group();
     seat.position.set(Math.cos(a) * 3.45, 0, Math.sin(a) * 3.45);
-    seat.rotation.y = -a + Math.PI / 2; meeting.add(seat);
-    box(seat, 0, 0.58, 0, 0.92, 0.18, 0.86, i % 2 ? emeraldMat : material(0x7b3946));
-    box(seat, 0, 1.2, -0.34, 0.92, 1.15, 0.18, i % 2 ? emeraldMat : material(0x7b3946));
+    // The chair's local +Z direction is its front: point it radially inward at the table.
+    seat.rotation.y = -a - Math.PI / 2; meeting.add(seat);
+    const upholstery = i % 2 ? emeraldMat : material(0x7b3946, 0.72, 0.015);
+    box(seat, 0, 0.58, 0, 0.92, 0.18, 0.86, upholstery);
+    box(seat, 0, 1.2, -0.34, 0.92, 1.15, 0.18, upholstery);
+    // Upholstered armrests and champagne-metal supports make the meeting chairs read as executive furniture.
+    for (const side of [-1, 1]) {
+      box(seat, side * 0.49, 0.91, 0.02, 0.13, 0.12, 0.72, upholstery);
+      box(seat, side * 0.49, 0.72, 0.03, 0.045, 0.34, 0.055, goldMat, false);
+      box(seat, side * 0.49, 0.55, -0.32, 0.045, 0.52, 0.055, goldMat, false);
+    }
+    // Subtle tailored piping across the chair back.
+    box(seat, 0, 1.68, -0.235, 0.72, 0.025, 0.025, goldMat, false);
     cylinder(seat, 0, 0.25, 0, 0.08, 0.08, 0.5, darkMat);
   }
   for (let i = 0; i < 4; i++) {
@@ -371,8 +386,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
     box(meeting, Math.cos(a) * 1.45, 1.06, Math.sin(a) * 1.45, 0.58, 0.05, 0.38, screenMat, false);
   }
   // Meeting-room rug.
-  const rug = new THREE.Mesh(new THREE.CircleGeometry(6.0, 48), material(0x263f55, 0.95));
+  const rug = new THREE.Mesh(new THREE.CircleGeometry(6.0, 64), material(0x263f55, 0.95));
   rug.rotation.x = -Math.PI / 2; rug.position.set(0, 0.24, 1); building.add(rug);
+  const rugBorder = new THREE.Mesh(new THREE.TorusGeometry(5.72, 0.035, 8, 96), brassSoft);
+  rugBorder.rotation.x = Math.PI / 2; rugBorder.position.set(0, 0.255, 1); building.add(rugBorder);
 
   // Reception desk and branded wall at the open entrance, left side.
   const reception = new THREE.Group(); reception.position.set(-14.3, 0, 10.4); reception.rotation.y = Math.PI / 2; building.add(reception);
@@ -513,6 +530,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
 
   const entranceLight = new THREE.PointLight(0xffe2b4, 18, 20);
   entranceLight.position.set(-14,4,10); scene.add(entranceLight);
+  // Soft focused illumination gives the conference table a warmer architectural focal point.
+  const meetingFill = new THREE.PointLight(0xffdfb0, qualityTier === "high" ? 24 : 15, 15, 2);
+  meetingFill.position.set(0, 5.1, 1); scene.add(meetingFill);
+  const loungeFill = new THREE.PointLight(0xd6e6ff, qualityTier === "high" ? 12 : 7, 12, 2);
+  loungeFill.position.set(12, 4.2, 9.5); scene.add(loungeFill);
 
   // Living employee agents: distinct appearance, autonomous walking and social conversations.
   const employeeObjects = [];
@@ -1087,7 +1109,7 @@ export function mountZoreVirtualOffice(host, options = {}) {
     }
     chosen.forEach((p,i)=>{
       const angle=(i/chosen.length)*Math.PI*2-Math.PI/2;
-      const seat={x:Math.cos(angle)*3.45,z:1+Math.sin(angle)*3.45,yaw:-angle+Math.PI/2};
+      const seat={x:Math.cos(angle)*3.45,z:1+Math.sin(angle)*3.45,yaw:-angle-Math.PI/2};
       const approach={x:Math.cos(angle+0.34)*4.65,z:1+Math.sin(angle+0.34)*4.65};
       setSeatedPose(p,false);p.userData.partner=null;p.userData.seat=seat;
       p.userData.state="going_to_meeting";p.userData.target.set(approach.x,0.12,approach.z);
