@@ -18,6 +18,10 @@ const employeeByIdx=idx=>EMPLOYEE_PROFILES.find(e=>e.idx===Number(idx));
 const statusLabel={queued:"Dalam antrean",in_progress:"Sedang dikerjakan",submitted:"Menunggu pemeriksaan",revision:"Perlu revisi",approved:"Disetujui",failed:"Gagal"};
 function taskStatusLabel(task){
   const status=task.status||"queued";
+  const latest=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version))[0];
+  if(status==="submitted"&&latest?.build_status==="queued")return "Menunggu build";
+  if(status==="submitted"&&latest?.build_status==="in_progress")return "Build sedang berjalan";
+  if(latest?.build_status==="failed")return "Build gagal · perlu perbaikan";
   if(status!=="submitted")return statusLabel[status]||status;
   if(!task.chain_id||Number(task.stage_order||0)===0)return "Menunggu persetujuan awal";
   if(Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||""))return "Menunggu pemeriksaan akhir";
@@ -59,14 +63,84 @@ function previewHtmlFor(result){
   return looksLikeHtml||htmlFile||htmlType?content:null;
 }
 function renderResultToolbar(result){
-  const preview=previewHtmlFor(result)!==null
+  const previewAllowed=["passed","not_required"].includes(result.build_status||"not_required");
+  const preview=previewHtmlFor(result)!==null&&previewAllowed
     ?'<button type="button" class="secondary preview-result" data-preview-result="'+esc(result.id)+'">Lihat preview</button>'
     :'';
-  return '<div class="result-toolbar"><small>Versi '+esc(result.version)+' · '+fmt(result.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(result.content||"")+'">Salin hasil</button>'+preview+'<button type="button" class="secondary download-result" data-download-result="'+esc(result.id)+'">Unduh '+esc(result.file_name||"hasil-pekerjaan.txt")+'</button></div>';
+  const buildStatus=result.build_status||"not_required";
+  const buildLabels={queued:"MENUNGGU BUILD",in_progress:"BUILD BERJALAN",passed:"BUILD BERHASIL",failed:"BUILD GAGAL",cancelled:"BUILD DIBATALKAN",not_required:"BUILD TIDAK DIPERLUKAN"};
+  const buildClass=buildStatus==="passed"?"passed":buildStatus==="failed"||buildStatus==="cancelled"?"failed":["queued","in_progress"].includes(buildStatus)?"pending":"neutral";
+  const badge='<span class="build-status '+buildClass+'">'+(buildLabels[buildStatus]||esc(buildStatus))+'</span>';
+  const fileCount=Array.isArray(result.files_manifest)?result.files_manifest.length:0;
+  const files=fileCount?'<button type="button" class="secondary" data-open-artifacts="'+esc(result.task_id)+'" data-artifact-version="'+esc(result.version)+'">File source ('+fileCount+')</button>':'';
+  const logs=result.build_workflow_url?'<a class="secondary build-log-link" href="'+esc(result.build_workflow_url)+'" target="_blank" rel="noopener noreferrer">Lihat laporan build</a>':'';
+  const error=result.build_error?'<small class="build-error-inline">'+esc(result.build_error)+'</small>':'';
+  return '<div class="result-toolbar"><small>Versi '+esc(result.version)+' · '+fmt(result.created_at)+'</small>'+badge+'<button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(result.content||"")+'">Salin hasil</button>'+files+preview+logs+'<button type="button" class="secondary download-result" data-download-result="'+esc(result.id)+'">Unduh '+esc(result.file_name||"hasil-pekerjaan.txt")+'</button>'+error+'</div>';
+}
+async function openTaskArtifacts(taskId,version,button){
+  const original=button.textContent;button.disabled=true;button.textContent="Memuat file…";
+  try{
+    const {data,error}=await supabase.functions.invoke("office-artifact",{body:{task_id:taskId,version}});
+    if(error)throw new Error(error.message||"Gagal membaca file.");
+    if(!data?.ok)throw new Error(data?.error||"File hasil tidak tersedia.");
+    document.querySelector("#artifact-browser-dialog")?.remove();
+    const dialog=document.createElement("dialog");dialog.id="artifact-browser-dialog";dialog.className="result-preview-dialog";
+    const header=document.createElement("div");header.className="result-preview-header";
+    const title=document.createElement("strong");title.textContent="File hasil pekerjaan · versi "+version;
+    const close=document.createElement("button");close.type="button";close.className="secondary";close.textContent="Tutup";close.addEventListener("click",()=>dialog.close());
+    header.append(title,close);
+    const summary=document.createElement("p");summary.className="result-preview-note";
+    summary.textContent="Status build: "+String(data.build?.status||"belum diperiksa").toUpperCase()+(data.build?.error?" · "+data.build.error:"");
+    const list=document.createElement("div");list.className="artifact-file-list";
+    const previewHost=document.createElement("div");previewHost.className="artifact-preview-host";
+    const files=Array.isArray(data.artifacts)?data.artifacts:[];
+    for(const file of files){
+      const row=document.createElement("div");row.className="artifact-file-row";
+      const info=document.createElement("div");info.className="artifact-file-info";
+      const name=document.createElement("strong");name.textContent=file.path;
+      const meta=document.createElement("small");meta.textContent=(file.content_type||"file")+" · "+Math.max(1,Math.round(Number(file.size_bytes||0)/1024))+" KB";
+      info.append(name,meta);row.append(info);
+      const actions=document.createElement("div");actions.className="artifact-file-actions";
+      const download=document.createElement("a");download.href=file.download_url;download.target="_blank";download.rel="noopener noreferrer";download.textContent="Unduh";download.className="secondary";download.setAttribute("download",file.name||"hasil");
+      actions.append(download);
+      if(file.preview_url){
+        const preview=document.createElement("button");preview.type="button";preview.className="secondary";preview.textContent="Preview";
+        preview.addEventListener("click",()=>{
+          previewHost.replaceChildren();
+          const frame=document.createElement("iframe");frame.className="result-preview-frame";frame.title="Preview "+file.path;frame.setAttribute("sandbox","");frame.src=file.preview_url;previewHost.append(frame);
+        });
+        actions.append(preview);
+      }
+      if(/^text\//.test(file.content_type||"")||["application/json","image/svg+xml"].includes(file.content_type)){
+        const source=document.createElement("button");source.type="button";source.className="secondary";source.textContent="Source Code";
+        source.addEventListener("click",async()=>{
+          source.disabled=true;source.textContent="Memuat…";
+          try{
+            const response=await fetch(file.download_url);if(!response.ok)throw new Error("HTTP "+response.status);
+            const text=await response.text();
+            previewHost.replaceChildren();
+            const pre=document.createElement("pre");pre.className="artifact-source-view";pre.textContent=text.slice(0,500000);previewHost.append(pre);
+          }catch(err){showNotice("Source code tidak dapat dibuka: "+(err?.message||err),"error");}
+          finally{source.disabled=false;source.textContent="Source Code";}
+        });
+        actions.append(source);
+      }
+      row.append(actions);list.append(row);
+    }
+    if(!files.length){const empty=document.createElement("p");empty.className="report-empty";empty.textContent="Belum ada file source yang tersimpan untuk versi ini.";list.append(empty);}
+    const log=document.createElement("p");log.className="artifact-build-log";
+    if(data.build?.workflow_url){const a=document.createElement("a");a.href=data.build.workflow_url;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Buka log lengkap GitHub Actions";log.append(a);}
+    dialog.append(header,summary,list,previewHost,log);
+    dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
+    dialog.addEventListener("close",()=>dialog.remove(),{once:true});
+    document.body.appendChild(dialog);dialog.showModal();
+  }catch(error){showNotice("File hasil belum dapat dibuka: "+(error?.message||error),"error");}
+  finally{button.disabled=false;button.textContent=original;}
 }
 function openResultPreview(result){
   const html=previewHtmlFor(result);
   if(html===null){showNotice("Preview hanya tersedia untuk hasil HTML. Kode sumber tetap dapat dibaca dan diunduh.","error");return;}
+  if(!["passed","not_required"].includes(result.build_status||"not_required")){showNotice("Preview baru dibuka setelah build berhasil.","error");return;}
   document.querySelector("#result-preview-dialog")?.remove();
   const dialog=document.createElement("dialog");
   dialog.id="result-preview-dialog";
@@ -213,8 +287,17 @@ async function syncOffice(redraw=false){
   if(error){showNotice("Gagal membaca ruang kerja: "+error.message,"error");return;}
   officeData={tasks:data?.tasks||[],reports:data?.reports||[],activity:data?.activity||[]};
   const ids=officeData.tasks.map(t=>t.id).filter(Boolean);
-  if(ids.length){const {data:rows,error:resultError}=await supabase.from("office_task_results").select("id,task_id,version,content,model,created_at,storage_path,file_name,content_type").in("task_id",ids).order("version",{ascending:false});if(!resultError)resultRows=rows||[];}
-  else resultRows=[];
+  if(ids.length){
+    const resultQuery=()=>supabase.from("office_task_results")
+      .select("id,task_id,version,content,model,created_at,storage_path,file_name,content_type,build_status,build_run_id,build_workflow_url,build_branch,build_commit_sha,build_error,build_updated_at,build_attempt,files_manifest")
+      .in("task_id",ids).order("version",{ascending:false});
+    const {data:rows,error:resultError}=await resultQuery();if(!resultError)resultRows=rows||[];
+    const pendingBuilds=resultRows.filter(r=>["queued","in_progress"].includes(r.build_status)).slice(0,8);
+    if(pendingBuilds.length){
+      await Promise.allSettled(pendingBuilds.map(r=>supabase.functions.invoke("office-build-status",{body:{task_id:r.task_id,version:r.version}})));
+      const {data:refreshed,error:refreshError}=await resultQuery();if(!refreshError)resultRows=refreshed||[];
+    }
+  } else resultRows=[];
   if(googleNotebookAccessToken&&!notebookAutoSyncPaused)void syncFinalWorkToNotebook(true);
   if(redraw)renderWorkspace();
   else {
@@ -231,17 +314,31 @@ async function syncOffice(redraw=false){
 function rootWorkTasks(){
   return officeData.tasks.filter(t=>!t.chain_id||Number(t.stage_order||0)===0);
 }
+function latestTaskResult(taskId){
+  return resultRows.filter(r=>String(r.task_id)===String(taskId)).sort((a,b)=>Number(b.version)-Number(a.version))[0]||null;
+}
 function taskMatchesFilter(task,filter){
+  const result=latestTaskResult(task.id);
+  const build=result?.build_status||"not_required";
   if(filter==="queue")return ["queued","in_progress","revision"].includes(task.status);
+  if(filter==="build_pending")return ["queued","in_progress"].includes(build);
+  if(filter==="build_passed")return build==="passed";
+  if(filter==="build_failed")return build==="failed";
+  if(filter==="review")return task.status==="submitted"&&["passed","not_required"].includes(build);
+  if(filter==="ready_download")return build==="passed"&&Array.isArray(result?.files_manifest)&&result.files_manifest.length>0;
   return filter==="all"||task.status===filter;
 }
 function renderWorkMonitorContent(){
   const tasks=rootWorkTasks();
   const filters=[
-    {id:"queue",label:"Antrean / berjalan",count:tasks.filter(t=>taskMatchesFilter(t,"queue")).length},
-    {id:"submitted",label:"Menunggu tinjauan",count:tasks.filter(t=>t.status==="submitted").length},
-    {id:"approved",label:"Disetujui",count:tasks.filter(t=>t.status==="approved").length},
-    {id:"failed",label:"Gagal",count:tasks.filter(t=>t.status==="failed").length}
+    {id:"queue",label:"Sedang dikerjakan",count:tasks.filter(t=>taskMatchesFilter(t,"queue")).length},
+    {id:"build_pending",label:"Menunggu / proses build",count:tasks.filter(t=>taskMatchesFilter(t,"build_pending")).length},
+    {id:"build_passed",label:"Build berhasil",count:tasks.filter(t=>taskMatchesFilter(t,"build_passed")).length},
+    {id:"build_failed",label:"Build gagal",count:tasks.filter(t=>taskMatchesFilter(t,"build_failed")).length},
+    {id:"review",label:"Menunggu pemeriksaan",count:tasks.filter(t=>taskMatchesFilter(t,"review")).length},
+    {id:"ready_download",label:"Siap diunduh",count:tasks.filter(t=>taskMatchesFilter(t,"ready_download")).length},
+    {id:"approved",label:"Disetujui pemilik",count:tasks.filter(t=>t.status==="approved").length},
+    {id:"failed",label:"Tugas gagal",count:tasks.filter(t=>t.status==="failed").length}
   ];
   const visible=tasks.filter(t=>taskMatchesFilter(t,activeTaskFilter));
   return '<div class="work-stats">'+filters.map(f=>'<button type="button" class="work-stat-filter '+(activeTaskFilter===f.id?'active':'')+'" data-status-filter="'+f.id+'" aria-pressed="'+(activeTaskFilter===f.id)+'"><strong>'+f.count+'</strong><span>'+f.label+'</span></button>').join("")+'</div><div class="work-list">'+(visible.length?visible.map(taskCard).join(""):'<p class="empty-state">'+(tasks.length?'Tidak ada tugas pada kategori ini.':'Belum ada pekerjaan. Kirim pekerjaan pertama melalui formulir di atas.')+'</p>')+'</div>';
@@ -342,6 +439,8 @@ async function handleWorkListClick(event){
     finally{downloadButton.disabled=false;}
     return;
   }
+  const artifactButton=target.closest("[data-open-artifacts]");
+  if(artifactButton){await openTaskArtifacts(artifactButton.dataset.openArtifacts,Number(artifactButton.dataset.artifactVersion),artifactButton);return;}
   const previewButton=target.closest("[data-preview-result]");
   if(previewButton){
     const result=resultRows.find(item=>String(item.id)===String(previewButton.dataset.previewResult));
