@@ -147,6 +147,7 @@ async function openTaskArtifacts(taskId,version,button){
     }
     if(!files.length){const empty=document.createElement("p");empty.className="report-empty";empty.textContent="Belum ada file source yang tersimpan untuk versi ini.";list.append(empty);}
     const log=document.createElement("p");log.className="artifact-build-log";
+    if(buildRun?.preview_url){const previewLink=document.createElement("a");previewLink.href=buildRun.preview_url;previewLink.target="_blank";previewLink.rel="noopener noreferrer";previewLink.className="build-log-link";previewLink.textContent="Buka Preview hasil build di Vercel";log.append(previewLink);}
     if(data.build?.workflow_url){const a=document.createElement("a");a.href=data.build.workflow_url;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Buka log lengkap GitHub Actions";log.append(a);}
     dialog.append(header,summary,progressBox,list,previewHost,log);
     dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
