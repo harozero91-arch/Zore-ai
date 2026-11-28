@@ -91,6 +91,24 @@ async function openTaskArtifacts(taskId,version,button){
     header.append(title,close);
     const summary=document.createElement("p");summary.className="result-preview-note";
     summary.textContent="Status build: "+String(data.build?.status||"belum diperiksa").toUpperCase()+(data.build?.error?" · "+data.build.error:"");
+    const buildRun=Array.isArray(data.build_runs)?data.build_runs[0]:null;
+    const progressBox=document.createElement("section");progressBox.className="artifact-build-progress";
+    if(buildRun){
+      const progressTitle=document.createElement("strong");progressTitle.textContent="Tahapan build · "+(buildRun.details?.progress_percent??0)+"%";
+      progressBox.append(progressTitle);
+      for(const job of (buildRun.details?.jobs||[])){
+        const jobTitle=document.createElement("p");jobTitle.className="artifact-job-title";
+        jobTitle.textContent=job.name+" · "+(job.conclusion||job.status||"menunggu");progressBox.append(jobTitle);
+        for(const step of (job.steps||[])){
+          const line=document.createElement("small");line.className="artifact-step";
+          line.textContent=(step.conclusion==="success"?"✓ ":step.conclusion==="failure"?"✕ ":step.status==="in_progress"?"● ":"○ ")+step.name;
+          progressBox.append(line);
+        }
+      }
+      if(!buildRun.details?.jobs?.length){
+        const wait=document.createElement("small");wait.textContent="Runner sedang menyiapkan tahapan build.";progressBox.append(wait);
+      }
+    }
     const list=document.createElement("div");list.className="artifact-file-list";
     const previewHost=document.createElement("div");previewHost.className="artifact-preview-host";
     const files=Array.isArray(data.artifacts)?data.artifacts:[];
@@ -130,7 +148,7 @@ async function openTaskArtifacts(taskId,version,button){
     if(!files.length){const empty=document.createElement("p");empty.className="report-empty";empty.textContent="Belum ada file source yang tersimpan untuk versi ini.";list.append(empty);}
     const log=document.createElement("p");log.className="artifact-build-log";
     if(data.build?.workflow_url){const a=document.createElement("a");a.href=data.build.workflow_url;a.target="_blank";a.rel="noopener noreferrer";a.textContent="Buka log lengkap GitHub Actions";log.append(a);}
-    dialog.append(header,summary,list,previewHost,log);
+    dialog.append(header,summary,progressBox,list,previewHost,log);
     dialog.addEventListener("click",event=>{if(event.target===dialog)dialog.close();});
     dialog.addEventListener("close",()=>dialog.remove(),{once:true});
     document.body.appendChild(dialog);dialog.showModal();
