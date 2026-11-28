@@ -1,1 +1,99 @@
-name: ZORE AI Employee 2D Animation Worker\n\non:\n  workflow_dispatch:\n    inputs:\n      task_name:\n        description: \"Nama tugas animasi 2D\"\n        required: true\n        type: string\n      employee:\n        description: \"Nama/jabatan karyawan\"\n        required: true\n        default: \"Dimas Kurniawan — AI 2D Animator\"\n        type: string\n      animation_script:\n        description: \"Kode Python Pillow untuk membuat frame animasi\"\n        required: true\n        type: string\n\npermissions:\n  contents: read\n\njobs:\n  animate:\n    runs-on: ubuntu-latest\n    timeout-minutes: 15\n    steps:\n      - name: Checkout repository\n        uses: actions/checkout@v4\n      - name: Install animation tools\n        run: |\n          sudo apt-get update\n          sudo apt-get install -y ffmpeg python3-pil python3-numpy\n          ffmpeg -version | head -n 1\n      - name: Prepare animation script\n        env:\n          ANIMATION_SCRIPT: ${{ inputs.animation_script }}\n          TASK_NAME: ${{ inputs.task_name }}\n          EMPLOYEE: ${{ inputs.employee }}\n        run: |\n          python3 - <<'PY'\n          import os, pathlib\n          script = os.environ.get('ANIMATION_SCRIPT', '')\n          if not script.strip() or len(script) > 20000: raise SystemExit('Skrip kosong atau terlalu panjang.')\n          pathlib.Path('/tmp/zore_2d_animation.py').write_text(script, encoding='utf-8')\n          pathlib.Path('output').mkdir(exist_ok=True)\n          pathlib.Path('task-info.txt').write_text('Tugas: '+os.environ.get('TASK_NAME','')+'\\nKaryawan: '+os.environ.get('EMPLOYEE','')+'\\nPipeline: Pillow + FFmpeg\\n')\n          PY\n      - name: Generate animation frames\n        env:\n          ZORE_OUTPUT_DIR: ${{ github.workspace }}/output\n        run: |\n          python3 /tmp/zore_2d_animation.py\n          test -n \"$(find output -type f -name '*.png' -print -quit)\" || (echo 'Skrip tidak menghasilkan PNG' && exit 1)\n      - name: Encode MP4, GIF and storyboard\n        run: |\n          python3 - <<'PY'\n          from pathlib import Path\n          from PIL import Image, ImageOps, ImageDraw\n          import json, subprocess, math\n          out=Path('output'); fd=out/'frames'; frames=sorted(fd.glob('*.png')) if fd.exists() else sorted(p for p in out.glob('*.png') if p.name!='storyboard.png')\n          if not frames: raise SystemExit('Tidak ada frame.')\n          norm=out/'normalized'; norm.mkdir(exist_ok=True)\n          for i,p in enumerate(frames):\n              im=Image.open(p).convert('RGB')\n              if im.size!=(1280,720): im=ImageOps.fit(im,(1280,720))\n              im.save(norm/f'frame_{i:06d}.png')\n          meta=json.loads((out/'animation.json').read_text()) if (out/'animation.json').exists() else {}; fps=max(1,min(60,int(meta.get('fps',24)))); n=len(frames)\n          subprocess.run(['ffmpeg','-y','-framerate',str(fps),'-i',str(norm/'frame_%06d.png'),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',str(out/'animation.mp4')],check=True)\n          step=max(1,round(fps/12)); imgs=[Image.open(norm/f'frame_{i:06d}.png').convert('RGB').resize((640,360)) for i in range(0,n,step)]\n          imgs[0].save(out/'animation-preview.gif',save_all=True,append_images=imgs[1:],duration=round(1000*step/fps),loop=0,optimize=True)\n          thumbs=[]\n          for i in range(0,n,max(1,math.ceil(n/12))):\n              im=Image.open(norm/f'frame_{i:06d}.png').convert('RGB'); im.thumbnail((320,180)); tile=Image.new('RGB',(340,210),'white'); tile.paste(im,((340-im.width)//2,8)); ImageDraw.Draw(tile).text((10,190),f'Frame {i}',fill='black'); thumbs.append(tile)\n          sheet=Image.new('RGB',(1020,math.ceil(len(thumbs)/3)*210),(225,225,225))\n          for i,t in enumerate(thumbs): sheet.paste(t,((i%3)*340,(i//3)*210))\n          sheet.save(out/'storyboard.png'); print(f'Encoded {n} frames at {fps} fps')\n          PY\n      - name: Validate outputs\n        run: |\n          test -s output/animation.mp4\n          test -s output/animation-preview.gif\n          test -s output/storyboard.png\n      - name: Upload 2D animation deliverables\n        uses: actions/upload-artifact@v4\n        with:\n          name: zore-2d-animation-${{ github.run_number }}\n          path: |\n            output/animation.mp4\n            output/animation-preview.gif\n            output/storyboard.png\n            output/animation.json\n            output/frames/*.png\n            task-info.txt\n          if-no-files-found: error\n          retention-days: 7\n
+name: ZORE AI Employee 2D Animation Worker
+
+on:
+  workflow_dispatch:
+    inputs:
+      task_name:
+        description: "Nama tugas animasi 2D"
+        required: true
+        type: string
+      employee:
+        description: "Nama/jabatan karyawan"
+        required: true
+        default: "Dimas Kurniawan — AI 2D Animator"
+        type: string
+      animation_script:
+        description: "Kode Python Pillow untuk membuat frame animasi"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  animate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Install animation tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ffmpeg python3-pil python3-numpy
+          ffmpeg -version | head -n 1
+      - name: Prepare animation script
+        env:
+          ANIMATION_SCRIPT: ${{ inputs.animation_script }}
+          TASK_NAME: ${{ inputs.task_name }}
+          EMPLOYEE: ${{ inputs.employee }}
+        run: |
+          python3 - <<'PY'
+          import os, pathlib
+          script = os.environ.get('ANIMATION_SCRIPT', '')
+          if not script.strip() or len(script) > 20000: raise SystemExit('Skrip kosong atau terlalu panjang.')
+          pathlib.Path('/tmp/zore_2d_animation.py').write_text(script, encoding='utf-8')
+          pathlib.Path('output').mkdir(exist_ok=True)
+          pathlib.Path('task-info.txt').write_text('Tugas: '+os.environ.get('TASK_NAME','')+'\
+Karyawan: '+os.environ.get('EMPLOYEE','')+'\
+Pipeline: Pillow + FFmpeg\
+')
+          PY
+      - name: Generate animation frames
+        env:
+          ZORE_OUTPUT_DIR: ${{ github.workspace }}/output
+        run: |
+          python3 /tmp/zore_2d_animation.py
+          test -n "$(find output -type f -name '*.png' -print -quit)" || (echo 'Skrip tidak menghasilkan PNG' && exit 1)
+      - name: Encode MP4, GIF and storyboard
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import json, subprocess, math
+          out=Path('output'); fd=out/'frames'; frames=sorted(fd.glob('*.png')) if fd.exists() else sorted(p for p in out.glob('*.png') if p.name!='storyboard.png')
+          if not frames: raise SystemExit('Tidak ada frame.')
+          norm=out/'normalized'; norm.mkdir(exist_ok=True)
+          for i,p in enumerate(frames):
+              im=Image.open(p).convert('RGB')
+              if im.size!=(1280,720): im=ImageOps.fit(im,(1280,720))
+              im.save(norm/f'frame_{i:06d}.png')
+          meta=json.loads((out/'animation.json').read_text()) if (out/'animation.json').exists() else {}; fps=max(1,min(60,int(meta.get('fps',24)))); n=len(frames)
+          subprocess.run(['ffmpeg','-y','-framerate',str(fps),'-i',str(norm/'frame_%06d.png'),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',str(out/'animation.mp4')],check=True)
+          step=max(1,round(fps/12)); imgs=[Image.open(norm/f'frame_{i:06d}.png').convert('RGB').resize((640,360)) for i in range(0,n,step)]
+          imgs[0].save(out/'animation-preview.gif',save_all=True,append_images=imgs[1:],duration=round(1000*step/fps),loop=0,optimize=True)
+          thumbs=[]
+          for i in range(0,n,max(1,math.ceil(n/12))):
+              im=Image.open(norm/f'frame_{i:06d}.png').convert('RGB'); im.thumbnail((320,180)); tile=Image.new('RGB',(340,210),'white'); tile.paste(im,((340-im.width)//2,8)); ImageDraw.Draw(tile).text((10,190),f'Frame {i}',fill='black'); thumbs.append(tile)
+          sheet=Image.new('RGB',(1020,math.ceil(len(thumbs)/3)*210),(225,225,225))
+          for i,t in enumerate(thumbs): sheet.paste(t,((i%3)*340,(i//3)*210))
+          sheet.save(out/'storyboard.png'); print(f'Encoded {n} frames at {fps} fps')
+          PY
+      - name: Validate outputs
+        run: |
+          test -s output/animation.mp4
+          test -s output/animation-preview.gif
+          test -s output/storyboard.png
+      - name: Upload 2D animation deliverables
+        uses: actions/upload-artifact@v4
+        with:
+          name: zore-2d-animation-${{ github.run_number }}
+          path: |
+            output/animation.mp4
+            output/animation-preview.gif
+            output/storyboard.png
+            output/animation.json
+            output/frames/*.png
+            task-info.txt
+          if-no-files-found: error
+          retention-days: 7
