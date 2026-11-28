@@ -230,3 +230,25 @@
  .zore-office__clock strong{font-size:21px}
  .zore-office__actions{justify-content:flex-end}
 }
+
+
+/* Laporan transparan per karyawan dan tahapan kolaborasi */
+.team-report-details{margin-top:18px;padding:16px;border:1px solid rgba(148,163,184,.35);border-radius:14px;background:rgba(15,23,42,.035)}
+.team-report-details>summary{cursor:pointer;font-weight:800;font-size:1rem;padding:4px 0}
+.team-report-intro{font-size:.9rem;line-height:1.55;opacity:.8;margin:10px 0 16px}
+.team-stage-list{display:grid;gap:14px}
+.team-stage{padding:15px;border:1px solid rgba(148,163,184,.3);border-radius:12px;background:rgba(255,255,255,.035);min-width:0}
+.team-stage-head,.report-entry-head{display:flex;align-items:flex-start;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.team-stage-number{font-size:.72rem;letter-spacing:.08em;font-weight:800;opacity:.75}
+.team-stage h4{margin:5px 0;font-size:1rem}
+.team-stage-head small,.report-entry-head small{opacity:.72;font-size:.78rem}
+.team-stage-instructions{white-space:pre-wrap;line-height:1.55;font-size:.9rem}
+.team-stage-meta{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.78rem;opacity:.75;padding:9px 0;border-top:1px solid rgba(148,163,184,.2);border-bottom:1px solid rgba(148,163,184,.2)}
+.employee-report-block,.employee-deliverables,.employee-activity-block{margin-top:14px}
+.employee-report-block h5,.employee-deliverables h5,.employee-activity-block h5{margin:0 0 8px;font-size:.88rem}
+.employee-report-entry{padding:11px;margin:8px 0;border-radius:9px;background:rgba(148,163,184,.09);overflow-wrap:anywhere}
+.employee-report-entry p{white-space:pre-wrap;line-height:1.55;margin:8px 0}
+.report-empty{font-size:.84rem;opacity:.65;margin:6px 0}
+.employee-activity-block p{font-size:.82rem;line-height:1.5;margin:6px 0;padding-left:10px;border-left:2px solid rgba(148,163,184,.5)}
+.employee-activity-block time{font-variant-numeric:tabular-nums;opacity:.7}
+.team-stage pre{max-width:100%;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
