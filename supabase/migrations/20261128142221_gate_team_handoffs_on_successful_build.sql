@@ -1,3 +1,5 @@
+drop function if exists public.office_complete_task(uuid, text, text, text, text, text[]);
+
 create or replace function public.office_complete_task(
   p_task uuid,p_worker text,p_content text,p_model text,
   p_report text default null,p_issues text[] default '{}'::text[],p_requires_build boolean default false
