@@ -83,7 +83,7 @@ async function monitorOne(build: any) {
           const statuses = await statusResponse.json();
           const ready = (statuses || []).find((item:any) => item.state === 'success' && item.environment_url);
           if (ready?.environment_url) {
-            previewUrl = new URL('/work-results/' + build.task_id + '/v' + build.version + '/build/index.html', ready.environment_url).toString();
+            previewUrl = new URL('/work-results/' + build.task_id + '/v' + build.version + '/animation-preview.gif', ready.environment_url).toString();
             break;
           }
         }
