@@ -35,7 +35,7 @@ jobs:
       - name: Install Blender
         run: |
           sudo apt-get update
-          sudo apt-get install -y blender python3-numpy
+          sudo apt-get install -y blender python3-numpy ffmpeg
 
       - name: Prepare employee task
         env:
@@ -103,6 +103,25 @@ jobs:
           PY
             ZORE_OUTPUT_DIR="$GITHUB_WORKSPACE/output" blender --background --python /tmp/zore_starter_desk.py
           fi
+
+
+      - name: Encode rendered Blender frames to MP4
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess, shutil
+          out=Path('output')
+          frames=sorted([*out.glob('render_*.png'),*out.glob('frame_*.png')])
+          if not frames:
+              print('Tidak ada urutan frame PNG; MP4 dilewati. File Blender/GLB tetap diserahkan bila tersedia.')
+              raise SystemExit(0)
+          seq=out/'video_frames'; seq.mkdir(exist_ok=True)
+          for p in seq.iterdir():
+              if p.is_file(): p.unlink()
+          for i,p in enumerate(frames): shutil.copy2(p,seq/f'frame_{i:06d}.png')
+          subprocess.run(['ffmpeg','-y','-framerate','24','-i',str(seq/'frame_%06d.png'),'-c:v','libx264','-pix_fmt','yuv420p','-movflags','+faststart',str(out/'blender-animation.mp4')],check=True)
+          print(f'MP4 dibuat dari {len(frames)} frame.')
+          PY
 
       - name: Validate deliverables
         run: |
