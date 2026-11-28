@@ -10,7 +10,7 @@ const app=document.querySelector("#app");
 const OWNER_EMAIL="rendareza83@gmail.com";
 
 let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
-let googleNotebookAccessToken=null, notebookAutoSyncPaused=false;
+let googleNotebookAccessToken=null, notebookAutoSyncPaused=false, activeTaskFilter="all";
 supabase?.auth.onAuthStateChange((event,session)=>{if(session?.provider_token)googleNotebookAccessToken=session.provider_token;if(event==="SIGNED_OUT")googleNotebookAccessToken=null;});
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>v?new Date(v).toLocaleString("id-ID",{dateStyle:"short",timeStyle:"short"}):"—";
@@ -131,7 +131,7 @@ function renderGoogleTools(){
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
-  app.innerHTML=`<header class="topbar"><div><span class="eyebrow">WORKSPACE</span><h1>ZORE <span>AI</span></h1><p>Ruang kerja dan manajemen AI</p></div><div class="top-actions"><span class="signed-in">${esc(currentUser.email||"Pemilik")}</span><button id="signout" class="secondary">Keluar</button></div></header><nav class="quick-nav" aria-label="Navigasi cepat"><a href="#home">Ringkasan</a><a href="#zore-office-mount">Kantor 3D</a><a href="#organization">Karyawan</a><a href="#task-panel">Buat tugas</a><a href="#work-monitor">Pantau tugas</a><a href="#google-tools">Tools</a></nav><main id="home"><section class="office-intro"><span>DASHBOARD ZORE AI</span><h2>Semua pekerjaan dalam satu tempat</h2><p>Buat tugas, pantau proses karyawan, periksa hasil, dan gunakan alat bantu dari menu cepat.</p><div class="quick-actions"><a href="#task-panel">＋ Buat tugas</a><a href="#work-monitor">▤ Pantau pekerjaan</a><a href="#google-tools">⚙ Buka tools</a></div></section><section class="quick-task-helper"><div><strong>Mulai lebih cepat</strong><span>Pilih jenis pekerjaan untuk mengisi contoh instruksi.</span></div><div class="quick-task-buttons"><button type="button" data-task-preset="video">Video / animasi</button><button type="button" data-task-preset="website">Website / desain</button><button type="button" data-task-preset="research">Riset / dokumen</button><button type="button" data-task-preset="marketing">Konten / pemasaran</button></div></section><div id="google-tools">${renderGoogleTools()}</div><section class="virtual-office-section"><div id="zore-office-mount"></div></section><div id="organization">${renderOrganization()}</div><section class="profile-panel" id="profile-panel">${renderProfile(selectedEmployee)}</section><section class="task-panel" id="task-panel"><div class="section-heading"><div><span>AI WORK QUEUE</span><h2>Berikan pekerjaan nyata</h2></div><span>AI WORKER AKTIF</span></div><p class="panel-copy">Tugas akan dikirim ke antrean server. Manajer AI membagi pekerjaan ke spesialis, setiap tahap menghasilkan keluaran AI, lalu Anda cukup menyetujui rencana di awal dan hasil gabungan di akhir.</p><form id="task-form"><label>Judul pekerjaan<input id="task-title" maxlength="200" required placeholder="Contoh: Buat naskah animasi edukasi 60 detik"></label><label>Instruksi dan kriteria hasil<textarea id="task-instructions" maxlength="4000" rows="4" placeholder="Jelaskan tujuan, format, audiens, bahan, dan hasil yang diharapkan."></textarea></label><div class="task-form-row"><label>Spesialis prioritas (opsional)<select id="task-employee">${EMPLOYEE_PROFILES.filter(e=>e.idx>0).map(e=>'<option value="'+e.idx+'" '+(e.idx===1?"selected":"")+'>'+esc(e.name)+' — '+esc(e.title)+'</option>').join("")}</select></label></div><button class="primary" type="submit">Kirim ke sistem kerja AI</button><p id="task-message" class="auth-message"></p></form></section><section class="work-monitor" id="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div><div class="work-stats"><div><strong>${officeData.tasks.filter(t=>["queued","in_progress","revision"].includes(t.status)).length}</strong><span>Antrean / berjalan</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="submitted").length}</strong><span>Menunggu tinjauan</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="approved").length}</strong><span>Disetujui</span></div><div><strong>${officeData.tasks.filter(t=>t.status==="failed").length}</strong><span>Gagal</span></div></div><div class="work-list">${officeData.tasks.filter(t=>!t.chain_id||Number(t.stage_order||0)===0).length?officeData.tasks.filter(t=>!t.chain_id||Number(t.stage_order||0)===0).map(taskCard).join(""):'<p class="empty-state">Belum ada pekerjaan. Kirim pekerjaan pertama melalui formulir di atas.</p>'}</div></section><section class="activity-feed"><h2>Aktivitas dan laporan tim</h2>${officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>'}</section><div id="global-notice" class="notice" hidden></div></main><footer>ZORE AI · AI EMPLOYEE WORKSPACE</footer>`;
+  app.innerHTML=`<header class="topbar"><div><span class="eyebrow">WORKSPACE</span><h1>ZORE <span>AI</span></h1><p>Ruang kerja dan manajemen AI</p></div><div class="top-actions"><span class="signed-in">${esc(currentUser.email||"Pemilik")}</span><button id="signout" class="secondary">Keluar</button></div></header><nav class="quick-nav" aria-label="Navigasi cepat"><a href="#home">Ringkasan</a><a href="#zore-office-mount">Kantor 3D</a><a href="#organization">Karyawan</a><a href="#task-panel">Buat tugas</a><a href="#work-monitor">Pantau tugas</a><a href="#google-tools">Tools</a></nav><main id="home"><section class="office-intro"><span>DASHBOARD ZORE AI</span><h2>Semua pekerjaan dalam satu tempat</h2><p>Buat tugas, pantau proses karyawan, periksa hasil, dan gunakan alat bantu dari menu cepat.</p><div class="quick-actions"><a href="#task-panel">＋ Buat tugas</a><a href="#work-monitor">▤ Pantau pekerjaan</a><a href="#google-tools">⚙ Buka tools</a></div></section><section class="quick-task-helper"><div><strong>Mulai lebih cepat</strong><span>Pilih jenis pekerjaan untuk mengisi contoh instruksi.</span></div><div class="quick-task-buttons"><button type="button" data-task-preset="video">Video / animasi</button><button type="button" data-task-preset="website">Website / desain</button><button type="button" data-task-preset="research">Riset / dokumen</button><button type="button" data-task-preset="marketing">Konten / pemasaran</button></div></section><div id="google-tools">${renderGoogleTools()}</div><section class="virtual-office-section"><div id="zore-office-mount"></div></section><div id="organization">${renderOrganization()}</div><section class="profile-panel" id="profile-panel">${renderProfile(selectedEmployee)}</section><section class="task-panel" id="task-panel"><div class="section-heading"><div><span>AI WORK QUEUE</span><h2>Berikan pekerjaan nyata</h2></div><span>AI WORKER AKTIF</span></div><p class="panel-copy">Tugas akan dikirim ke antrean server. Manajer AI membagi pekerjaan ke spesialis, setiap tahap menghasilkan keluaran AI, lalu Anda cukup menyetujui rencana di awal dan hasil gabungan di akhir.</p><form id="task-form"><label>Judul pekerjaan<input id="task-title" maxlength="200" required placeholder="Contoh: Buat naskah animasi edukasi 60 detik"></label><label>Instruksi dan kriteria hasil<textarea id="task-instructions" maxlength="4000" rows="4" placeholder="Jelaskan tujuan, format, audiens, bahan, dan hasil yang diharapkan."></textarea></label><div class="task-form-row"><label>Spesialis prioritas (opsional)<select id="task-employee">${EMPLOYEE_PROFILES.filter(e=>e.idx>0).map(e=>'<option value="'+e.idx+'" '+(e.idx===1?"selected":"")+'>'+esc(e.name)+' — '+esc(e.title)+'</option>').join("")}</select></label></div><button class="primary" type="submit">Kirim ke sistem kerja AI</button><p id="task-message" class="auth-message"></p></form></section><section class="work-monitor" id="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div>${renderWorkMonitorContent()}</section><section class="activity-feed"><h2>Aktivitas dan laporan tim</h2>${officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>'}</section><div id="global-notice" class="notice" hidden></div></main><footer>ZORE AI · AI EMPLOYEE WORKSPACE</footer>`;
   const host=document.querySelector("#zore-office-mount");
   try{officeInstance=mountZoreVirtualOffice(host,{employees:EMPLOYEE_PROFILES,onEmployeeSelect:employee=>selectEmployee(employee.id)});}catch(e){host.innerHTML='<p class="empty-state">Tampilan 3D tidak dapat dimuat. Panel kerja tetap tersedia.</p>';console.error(e);}
   document.querySelector("#signout").addEventListener("click",async()=>{await supabase.auth.signOut();});
@@ -140,7 +140,7 @@ function renderWorkspace(){
   document.querySelectorAll("[data-org-profile]").forEach(b=>b.addEventListener("click",()=>selectEmployee(b.dataset.orgProfile)));
   document.querySelector("#profile-panel").addEventListener("click",()=>{});
   document.querySelector("#task-form").addEventListener("submit",assignTask);
-  document.querySelector("#refresh-work").addEventListener("click",()=>syncOffice(true));
+  bindWorkMonitor();
   const presets={
     video:{title:"Pembuatan video animasi",instructions:"Buat konsep video lengkap dengan ide cerita, naskah, storyboard per adegan, desain karakter dan latar, arahan animasi, serta hasil akhir yang siap ditinjau. Sertakan struktur adegan dan detail visual."},
     website:{title:"Perancangan website",instructions:"Rancang website yang modern, sederhana, responsif untuk ponsel dan desktop. Jelaskan struktur halaman, navigasi, fitur utama, tampilan UI, dan implementasi teknis. Sertakan kode yang lengkap bila memungkinkan."},
@@ -173,14 +173,46 @@ async function syncOffice(redraw=false){
     if(monitor){
       const temp=document.createElement("div");temp.innerHTML=renderWorkspaceSnapshot();
       const updated=temp.querySelector(".work-monitor");monitor.replaceWith(updated);
-      updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
+      bindWorkMonitor();
     }
     const feed=document.querySelector(".activity-feed");
     if(feed) feed.innerHTML='<h2>Aktivitas dan laporan tim</h2>'+(officeData.activity.slice(0,12).map(a=>'<p><span>'+fmt(a.created_at)+'</span> '+esc(a.message)+'</p>').join("")||'<p>Belum ada aktivitas baru.</p>');
   }
 }
+function rootWorkTasks(){
+  return officeData.tasks.filter(t=>!t.chain_id||Number(t.stage_order||0)===0);
+}
+function taskMatchesFilter(task,filter){
+  if(filter==="queue")return ["queued","in_progress","revision"].includes(task.status);
+  return filter==="all"||task.status===filter;
+}
+function renderWorkMonitorContent(){
+  const tasks=rootWorkTasks();
+  const filters=[
+    {id:"queue",label:"Antrean / berjalan",count:tasks.filter(t=>taskMatchesFilter(t,"queue")).length},
+    {id:"submitted",label:"Menunggu tinjauan",count:tasks.filter(t=>t.status==="submitted").length},
+    {id:"approved",label:"Disetujui",count:tasks.filter(t=>t.status==="approved").length},
+    {id:"failed",label:"Gagal",count:tasks.filter(t=>t.status==="failed").length}
+  ];
+  const visible=tasks.filter(t=>taskMatchesFilter(t,activeTaskFilter));
+  return '<div class="work-stats">'+filters.map(f=>'<button type="button" class="work-stat-filter '+(activeTaskFilter===f.id?'active':'')+'" data-status-filter="'+f.id+'" aria-pressed="'+(activeTaskFilter===f.id)+'"><strong>'+f.count+'</strong><span>'+f.label+'</span></button>').join("")+'</div><div class="work-list">'+(visible.length?visible.map(taskCard).join(""):'<p class="empty-state">'+(tasks.length?'Tidak ada tugas pada kategori ini.':'Belum ada pekerjaan. Kirim pekerjaan pertama melalui formulir di atas.')+'</p>')+'</div>';
+}
+function bindWorkMonitor(){
+  const monitor=document.querySelector(".work-monitor");
+  if(!monitor||monitor.dataset.filtersBound==="true")return;
+  monitor.dataset.filtersBound="true";
+  monitor.addEventListener("click",event=>{
+    const filterButton=event.target.closest("[data-status-filter]");
+    if(filterButton){
+      activeTaskFilter=filterButton.dataset.statusFilter;
+      monitor.querySelector(".work-stats").parentElement.innerHTML=renderWorkMonitorContent();
+      return;
+    }
+    if(event.target.closest("#refresh-work"))syncOffice(true);
+  });
+}
 function renderWorkspaceSnapshot(){
-  return '<section class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div><div class="work-stats"><div><strong>'+officeData.tasks.filter(t=>["queued","in_progress","revision"].includes(t.status)).length+'</strong><span>Antrean / berjalan</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="submitted").length+'</strong><span>Menunggu tinjauan</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="approved").length+'</strong><span>Disetujui</span></div><div><strong>'+officeData.tasks.filter(t=>t.status==="failed").length+'</strong><span>Gagal</span></div></div><div class="work-list">'+(officeData.tasks.length?officeData.tasks.map(taskCard).join(""):'<p class="empty-state">Belum ada pekerjaan.</p>')+'</div></section>';
+  return '<section class="work-monitor"><div class="section-heading"><div><span>REAL WORK MONITOR</span><h2>Pemantauan pekerjaan</h2></div><button id="refresh-work" class="secondary">Perbarui</button></div>'+renderWorkMonitorContent()+'</section>';
 }
 async function assignTask(event){
   event.preventDefault();const button=event.currentTarget.querySelector("button[type=submit]");const msg=document.querySelector("#task-message");
