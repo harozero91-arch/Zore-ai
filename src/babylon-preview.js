@@ -9,6 +9,8 @@ import { PBRMaterial } from "@babylonjs/core/Materials/PBR/pbrMaterial";
 import { ArcRotateCamera } from "@babylonjs/core/Cameras/arcRotateCamera";
 import { ShadowGenerator } from "@babylonjs/core/Lights/Shadows/shadowGenerator";
 import { TransformNode } from "@babylonjs/core/Meshes/transformNode";
+import { SceneLoader } from "@babylonjs/core/Loading/sceneLoader";
+import "@babylonjs/loaders/glTF";
 
 const canvas=document.getElementById("renderCanvas");
 const viewport=document.getElementById("viewport");
@@ -73,6 +75,38 @@ box("meeting divider",.18,2.4,9,-10,1.2,1,wood);box("divider cap",.28,.12,9,-10,
 // Lighting fixtures and columns.
 for(const x of [-10,0,10]){cylinder("gold column",.16,7,x,3.5,-8,gold,16);cylinder("column base",.42,.16,x,.12,-8,wood,20);}
 for(const x of [-8,0,8]){box("ceiling light",3,.08,.55,x,7.5,-2,gold);box("light diffuser",2.7,.04,.42,x,7.43,-2,marble);}
+const generatedOfficeMeshes=new Set(scene.meshes);
+let importedOfficeRoot=null;
+const modelInput=document.getElementById("officeModel");
+const restoreButton=document.getElementById("restoreOffice");
+document.getElementById("loadOffice").addEventListener("click",()=>modelInput.click());
+modelInput.addEventListener("change",async()=>{
+ const file=modelInput.files?.[0];if(!file)return;
+ if(!/\.glb$/i.test(file.name)){status.textContent="Pilih file .GLB hasil ekspor Blender.";modelInput.value="";return;}
+ status.textContent="Memuat model Blender…";
+ try{
+  if(importedOfficeRoot){importedOfficeRoot.dispose(false,true);importedOfficeRoot=null;}
+  const result=await SceneLoader.ImportMeshAsync("", "", file, scene);
+  const meshes=result.meshes.filter(mesh=>mesh.getTotalVertices()>0);
+  if(!meshes.length)throw new Error("File tidak berisi mesh 3D.");
+  let min=new Vector3(Infinity,Infinity,Infinity),max=new Vector3(-Infinity,-Infinity,-Infinity);
+  for(const mesh of meshes){mesh.computeWorldMatrix(true);const b=mesh.getBoundingInfo().boundingBox;min=Vector3.Minimize(min,b.minimumWorld);max=Vector3.Maximize(max,b.maximumWorld);}
+  const size=max.subtract(min),largest=Math.max(size.x,size.y,size.z);
+  if(!Number.isFinite(largest)||largest<=0)throw new Error("Ukuran model tidak valid.");
+  importedOfficeRoot=new TransformNode("blender-office-root",scene);
+  for(const mesh of meshes)if(!mesh.parent)mesh.parent=importedOfficeRoot;
+  const scale=22/largest;importedOfficeRoot.scaling.setAll(scale);
+  importedOfficeRoot.position.set(-(min.x+max.x)*.5*scale,-min.y*scale,-(min.z+max.z)*.5*scale);
+  for(const mesh of generatedOfficeMeshes)mesh.setEnabled(false);
+  restoreButton.hidden=false;status.textContent="Model Blender aktif · "+file.name;
+ }catch(error){status.textContent="Gagal memuat GLB: "+(error?.message||"format tidak didukung");console.error("Blender GLB import failed",error);}
+ modelInput.value="";
+});
+restoreButton.addEventListener("click",()=>{
+ if(importedOfficeRoot){importedOfficeRoot.dispose(false,true);importedOfficeRoot=null;}
+ for(const mesh of generatedOfficeMeshes)mesh.setEnabled(true);
+ restoreButton.hidden=true;status.textContent="Kantor prosedural Babylon.js dipulihkan";
+});
 let shadows=null;
 if(!mobile){shadows=new ShadowGenerator(1024,sun);shadows.useBlurExponentialShadowMap=true;shadows.blurKernel=16;for(const mesh of scene.meshes){if(mesh.name.includes("employee")||mesh.name.includes("desk")||mesh.name.includes("chair"))shadows.addShadowCaster(mesh);}}
 function applyQuality(next){
@@ -88,5 +122,5 @@ const resizeObserver=new ResizeObserver(()=>engine.resize());resizeObserver.obse
 document.addEventListener("visibilitychange",()=>{if(document.hidden){engine.stopRenderLoop();}else if(!disposed)engine.runRenderLoop(render);});
 function render(){if(disposed||document.hidden)return;scene.render();frames++;const now=performance.now();if(now-lastFrame>=1000){fps=Math.round(frames*1000/(now-lastFrame));frames=0;lastFrame=now;stats.textContent=fps+" FPS · "+(mobile?"Android/mobile":"desktop")+" · "+quality+" · "+engine.getRenderWidth()+"×"+engine.getRenderHeight();}}
 engine.runRenderLoop(render);
-status.textContent="Babylon.js aktif · prototipe uji";
+status.textContent="Babylon.js aktif · siap memuat model Blender (.glb)";
 window.addEventListener("beforeunload",()=>{disposed=true;resizeObserver.disconnect();engine.dispose();});
