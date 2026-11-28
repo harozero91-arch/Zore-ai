@@ -1,0 +1,64 @@
+name: Build ZORE AI 3D Office
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "cloud/build_zore_office.py"
+      - ".github/workflows/build-office.yml"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zore-office-build
+  cancel-in-progress: false
+
+jobs:
+  build-office:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Install Blender
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y blender
+
+      - name: Generate ZORE AI executive office
+        run: |
+          mkdir -p public/assets/blender
+          ZORE_OUTPUT_DIR="$GITHUB_WORKSPACE/public/assets/blender" blender -b -t 2 --python cloud/build_zore_office.py
+
+      - name: Verify exported files
+        run: |
+          test -s public/assets/blender/zore-ai-executive-office.blend
+          test -s public/assets/blender/zore-ai-executive-office.glb
+          ls -lh public/assets/blender/
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: zore-ai-executive-office
+          path: |
+            public/assets/blender/zore-ai-executive-office.blend
+            public/assets/blender/zore-ai-executive-office.glb
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Commit generated 3D assets
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/assets/blender/
+          if git diff --cached --quiet; then
+            echo "No generated asset changes."
+          else
+            git commit -m "Generate ZORE AI executive office 3D assets"
+            git push origin HEAD:main
+          fi
