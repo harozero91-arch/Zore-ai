@@ -4,6 +4,7 @@ import { mountZoreVirtualOffice } from "../index.js";
 import { supabase } from "./supabase.js";
 import { EMPLOYEE_PROFILES, ORG_DEPARTMENTS, getCharacterState, getCollaborators } from "./employee-character-system.js";
 import { buildEmployeeTaskBrief } from "./ai-agent-policy.js";
+import { createTaskMp4 } from "./task-video.js";
 
 const app=document.querySelector("#app");
 const OWNER_EMAIL="rendareza83@gmail.com";
@@ -63,7 +64,7 @@ function taskCard(task){
   const e=employeeByIdx(task.employee_idx); const status=task.status||"queued"; const progress=Number(task.progress||0); const isAi=task.progress_kind==="ai_generated";
   const results=resultRows.filter(r=>r.task_id===task.id).sort((a,b)=>b.version-a.version);
   const reports=officeData.reports.filter(r=>r.task_id===task.id);
-  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${renderTeamReport(task)}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
+  return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${results.length?`<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="${esc(task.id)}">Buat video MP4 dari hasil tugas</button><small>Video berisi materi hasil AI yang tersimpan, bukan rekaman animasi kantor.</small></div>`:""}${renderTeamReport(task)}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
@@ -119,6 +120,8 @@ async function assignTask(event){
 async function handleWorkListClick(event){
   const target=event.target instanceof Element?event.target:null;
   if(!target)return;
+  const videoButton=target.closest("[data-make-video]");
+  if(videoButton){await exportTaskMp4(videoButton.dataset.makeVideo,videoButton);return;}
   const cancelButton=target.closest("[data-cancel-delete]");
   if(cancelButton){cancelButton.closest(".delete-confirmation")?.remove();return;}
   const confirmButton=target.closest("[data-confirm-delete]");
@@ -211,6 +214,33 @@ async function performTaskDeletion(taskId,deleteButton){
     updated.querySelector("#refresh-work")?.addEventListener("click",()=>syncOffice(true));
   }
   showNotice("Tugas berhasil dihapus dan langsung dihilangkan dari layar.","success");
+}
+async function exportTaskMp4(taskId,button){
+  const task=officeData.tasks.find(item=>String(item.id)===String(taskId));
+  const results=resultRows.filter(item=>String(item.task_id)===String(taskId)).sort((a,b)=>Number(a.version)-Number(b.version));
+  if(!task||!results.length){showNotice("Hasil AI untuk tugas ini belum tersedia. Video belum dibuat.","error");return;}
+  const original=button.textContent;
+  button.disabled=true;button.textContent="Menyusun video MP4…";
+  try{
+    const employee=employeeByIdx(task.employee_idx);
+    const blob=await createTaskMp4({
+      title:task.title,
+      instructions:task.instructions,
+      employeeName:employee?.name||"Tim ZORE AI",
+      results
+    });
+    if(!blob||blob.type!=="video/mp4"||blob.size<1000)throw new Error("File MP4 tidak berhasil dibuat dengan benar.");
+    const url=URL.createObjectURL(blob);
+    const link=document.createElement("a");
+    const safeName=String(task.title||"hasil-zore-ai").normalize("NFKD").replace(/[^a-zA-Z0-9-_]+/g,"-").replace(/^-+|-+$/g,"").slice(0,70)||"hasil-zore-ai";
+    link.href=url;link.download=safeName+".mp4";document.body.appendChild(link);link.click();link.remove();
+    setTimeout(()=>URL.revokeObjectURL(url),30000);
+    button.textContent="MP4 berhasil dibuat";
+    showNotice("Video MP4 berhasil dibuat dan unduhan dimulai.","success");
+  }catch(error){
+    button.disabled=false;button.textContent=original;
+    showNotice("Video MP4 belum dapat dibuat: "+(error?.message||"Kesalahan tidak diketahui."),"error");
+  }
 }
 async function handleReview(event){
   const approve=event.target.closest("[data-approve]"),revise=event.target.closest("[data-revise]");if(!approve&&!revise)return;
