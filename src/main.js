@@ -131,10 +131,12 @@ async function handleWorkListClick(event){
     if(!result?.storage_path){showNotice("Berkas hasil belum tersimpan di penyimpanan.","error");return;}
     const original=downloadButton.textContent;downloadButton.disabled=true;downloadButton.textContent="Menyiapkan unduhan…";
     try{
-      const {data,error}=await supabase.storage.from("zore-work-results").createSignedUrl(result.storage_path,90);
-      if(error||!data?.signedUrl)throw error||new Error("Tautan unduhan tidak tersedia.");
-      const link=document.createElement("a");link.href=data.signedUrl;link.download=result.file_name||"hasil-pekerjaan";document.body.appendChild(link);link.click();link.remove();
-      downloadButton.textContent="Unduhan dimulai";showNotice("Berkas hasil karyawan berhasil disiapkan untuk diunduh.","success");
+      if(typeof result.content!=="string"||!result.content.length)throw new Error("Isi hasil belum tersedia untuk diunduh.");
+      const blob=new Blob([result.content],{type:result.content_type||"text/plain;charset=utf-8"});
+      const url=URL.createObjectURL(blob);
+      const link=document.createElement("a");link.href=url;link.download=result.file_name||"hasil-pekerjaan";document.body.appendChild(link);link.click();link.remove();
+      setTimeout(()=>URL.revokeObjectURL(url),30000);
+      downloadButton.textContent="Unduhan dimulai";showNotice("Berkas diunduh dari isi hasil terbaru yang tersimpan, termasuk lampiran gabungan.","success");
     }catch(error){downloadButton.textContent=original;showNotice("Berkas belum dapat diunduh: "+(error?.message||"Kesalahan penyimpanan."),"error");}
     finally{downloadButton.disabled=false;}
     return;
