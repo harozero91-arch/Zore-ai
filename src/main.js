@@ -205,7 +205,7 @@ function bindWorkMonitor(){
     const filterButton=event.target.closest("[data-status-filter]");
     if(filterButton){
       activeTaskFilter=filterButton.dataset.statusFilter;
-      monitor.querySelector(".work-stats").parentElement.innerHTML=renderWorkMonitorContent();
+      const temp=document.createElement("div");temp.innerHTML=renderWorkMonitorContent();monitor.querySelector(".work-stats")?.replaceWith(temp.querySelector(".work-stats"));monitor.querySelector(".work-list")?.replaceWith(temp.querySelector(".work-list"));
       return;
     }
     if(event.target.closest("#refresh-work"))syncOffice(true);
