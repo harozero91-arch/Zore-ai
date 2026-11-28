@@ -10,6 +10,8 @@ const app=document.querySelector("#app");
 const OWNER_EMAIL="rendareza83@gmail.com";
 
 let officeInstance=null, currentUser=null, officeData={tasks:[],reports:[],activity:[]}, resultRows=[], selectedEmployee=EMPLOYEE_PROFILES[0], syncTimer=null;
+let googleNotebookAccessToken=null;
+supabase?.auth.onAuthStateChange((event,session)=>{if(session?.provider_token)googleNotebookAccessToken=session.provider_token;if(event==="SIGNED_OUT")googleNotebookAccessToken=null;});
 const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const fmt=v=>v?new Date(v).toLocaleString("id-ID",{dateStyle:"short",timeStyle:"short"}):"—";
 const employeeByIdx=idx=>EMPLOYEE_PROFILES.find(e=>e.idx===Number(idx));
@@ -71,15 +73,46 @@ function taskCard(task){
   const videoAction=isFinalMerge&&results.length>0?'<div class="task-video-actions"><button type="button" class="secondary make-task-video" data-make-video="'+esc(task.id)+'">Buat MP4 + dubbing hasil gabungan</button><small>MP4 dibuat hanya dari keluaran final manajer setelah pemeriksaan dan penggabungan. Narasi suara Bahasa Indonesia disertakan.</small></div>':"";
   return `<article class="work-card"><div class="work-card-head"><div><span class="work-employee">${esc(e?.name||"Tim ZORE AI")} · Tahap ${Number(task.stage_order||0)+1}</span><h3>${esc(task.title)}</h3></div><span class="task-status ${esc(status)}">${statusLabel[status]||esc(status)}</span></div><p>${esc(task.instructions||"")} </p><div class="task-meta"><span>Prioritas: ${esc(task.priority||"normal")}</span><span>Dibuat: ${fmt(task.created_at)}</span><span>${isAi?"Progres dari proses AI":"Status antrean"}</span></div><div class="progress-track"><i style="width:${Math.max(0,Math.min(100,progress*100))}%"></i></div><div class="progress-caption">${isAi?Math.round(progress*100)+"%":"Progres belum diverifikasi sebagai hasil AI"}</div>${task.last_error?'<p class="task-error">'+esc(task.last_error)+'</p>':""}${reports.length?'<details class="result-details"><summary>Laporan tahap ini ('+reports.length+')</summary>'+reports.map(r=>'<div class="manager-report-wrap"><p class="manager-report"><strong>'+esc(r.kind==="final"?"Laporan hasil":r.kind==="issue"?"Kendala":r.kind==="revision"?"Revisi":"Catatan sistem")+' · '+fmt(r.created_at)+'</strong><br>'+esc(r.body)+'</p><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.body)+'">Salin laporan</button></div>').join("")+'</details>':""}${results.length?'<details class="result-details"><summary>Hasil kerja AI ('+results.length+')</summary>'+results.map(r=>'<div class="result-body"><div class="result-toolbar"><small>Versi '+esc(r.version)+' · '+fmt(r.created_at)+'</small><button type="button" class="secondary copy-report" data-copy-text="'+encodeURIComponent(r.content)+'">Salin hasil</button></div><pre>'+esc(r.content)+'</pre></div>').join("")+'</details>':""}${videoAction}${renderTeamReport(task)}${status==="submitted"?'<div class="review-actions"><button data-approve="'+esc(task.id)+'" class="approve">Setujui hasil</button><button data-revise="'+esc(task.id)+'" class="secondary">Minta revisi</button></div>':""}<div class="task-management"><button type="button" class="delete-task" data-delete-task="${esc(task.id)}" aria-label="Hapus tugas">Hapus tugas</button></div></article>`;
 }
+async function googleNotebookApi(path,options={}){
+  if(!googleNotebookAccessToken)throw new Error("Akun Google Notebook belum dihubungkan. Tekan Hubungkan Google terlebih dahulu.");
+  const response=await fetch("https://notebook.googleapis.com/v1"+path,{...options,headers:{"Authorization":"Bearer "+googleNotebookAccessToken,"Content-Type":"application/json",...(options.headers||{})}});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data?.error?.message||("Google Notebook API gagal ("+response.status+"). Periksa izin OAuth dan aktivasi API."));
+  return data;
+}
+async function connectGoogleNotebook(){
+  if(googleNotebookAccessToken){showNotice("Akun Google sudah memberikan akses Notebook untuk sesi ini.","success");return;}
+  const {error}=await supabase.auth.signInWithOAuth({provider:"google",options:{scopes:"https://www.googleapis.com/auth/notebook",redirectTo:window.location.origin,queryParams:{access_type:"offline",prompt:"consent"}}});
+  if(error)showNotice("Koneksi Google gagal: "+error.message,"error");
+}
+async function syncFinalWorkToNotebook(){
+  const button=document.querySelector("#notebook-sync");
+  if(button){button.disabled=true;button.textContent="Mengirim hasil…";}
+  try{
+    if(!googleNotebookAccessToken)throw new Error("Hubungkan akun Google terlebih dahulu.");
+    const finals=officeData.tasks.filter(t=>t.chain_id&&Number(t.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(t.title||"")&&["submitted","approved"].includes(t.status)).sort((a,b)=>new Date(b.completed_at||b.created_at)-new Date(a.completed_at||a.created_at));
+    const task=finals[0];
+    if(!task)throw new Error("Belum ada hasil akhir gabungan yang sudah diserahkan. Selesaikan satu alur kerja karyawan terlebih dahulu.");
+    const result=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version))[0];
+    if(!result?.content)throw new Error("Hasil akhir gabungan belum ditemukan di penyimpanan.");
+    const list=await googleNotebookApi("/notebooks");
+    let notebook=(list.notebooks||[]).find(n=>(n.display_name||n.displayName)==="ZORE AI — Pusat Riset dan Hasil Kerja");
+    if(!notebook)notebook=await googleNotebookApi("/notebooks",{method:"POST",body:JSON.stringify({display_name:"ZORE AI — Pusat Riset dan Hasil Kerja"})});
+    const content="# "+(task.title||"Hasil gabungan ZORE AI")+"\n\nStatus: "+task.status+"\n\n"+result.content.slice(0,950000);
+    const source=await googleNotebookApi("/"+notebook.name+"/sources",{method:"POST",body:JSON.stringify({display_name:"Hasil gabungan ZORE AI — "+(task.title||"Tugas final")+" — "+new Date().toLocaleDateString("id-ID"),mime_type:"text/markdown",text_content:{content}})});
+    showNotice("Berhasil mengirim hasil gabungan ke Gemini Notebook. Status sumber: "+(source.state||"diproses")+".","success");
+  }catch(error){showNotice("Sinkronisasi Notebook belum berhasil: "+(error?.message||error),"error");}
+  finally{if(button){button.disabled=false;button.textContent="Kirim hasil gabungan terakhir ke Notebook";}}
+}
 function renderGoogleTools(){
   const tools=[
-    {name:"Pomelli",tag:"KONTEN & PEMASARAN",desc:"Buat materi kampanye dan konten brand. Ekspor hasil dari Pomelli lalu masukkan ke tugas ZORE AI.",url:"https://labs.google.com/pomelli/about",status:"Gratis saat eksperimen",action:"Buka Pomelli"},
-    {name:"Stitch",tag:"DESAIN WEBSITE & UI",desc:"Rancang tampilan website dan prototipe. Ekspor desain atau kode untuk diterapkan ke proyek ZORE AI.",url:"https://stitch.withgoogle.com",status:"Akses sesuai akun Google",action:"Buka Stitch"},
-    {name:"Gemini Notebook",tag:"RISET & DOKUMEN",desc:"Analisis PDF, dokumen, catatan, dan sumber riset. Notebook API tersedia gratis selama Public Preview dengan kuota.",url:"https://notebooklm.google.com",status:"Paket gratis tersedia",action:"Buka Gemini Notebook"},
-    {name:"Antigravity",tag:"PEMROGRAMAN AI",desc:"Bantu pengembangan dan pemeriksaan kode melalui aplikasi komputer. Bukan layanan yang berjalan langsung di dashboard web.",url:"https://antigravity.google",status:"Aplikasi komputer",action:"Buka Antigravity"},
-    {name:"Opal",tag:"STATUS PRODUK",desc:"Google menghentikan Opal pada 17 November 2026. Alur kerja lama tidak berjalan lagi; gunakan fitur Gems di Gemini sebagai pengganti yang tersedia.",url:"https://gemini.google.com",status:"Opal dihentikan",action:"Buka Gemini"}
+    {name:"Pomelli",tag:"KONTEN & PEMASARAN",desc:"Buat materi kampanye dan konten brand. Belum tersedia koneksi API publik yang dapat dipakai ZORE AI.",url:"https://labs.google.com/pomelli/about",status:"Bantuan manual",action:"Buka Pomelli"},
+    {name:"Stitch",tag:"DESAIN WEBSITE & UI",desc:"Rancang tampilan website dan prototipe. Hasil desain/kode dapat diekspor untuk diterapkan.",url:"https://stitch.withgoogle.com",status:"Bantuan manual",action:"Buka Stitch"},
+    {name:"Gemini Notebook",tag:"RISET & DOKUMEN",desc:"API resmi untuk membuat notebook dan mengirim hasil kerja ZORE AI. Public Preview untuk akun Google pribadi.",url:"https://notebooklm.google.com",status:googleNotebookAccessToken?"Google terhubung untuk sesi ini":"Menunggu OAuth Google",action:"Buka Gemini Notebook"},
+    {name:"Antigravity",tag:"PEMROGRAMAN AI",desc:"Bantu pengembangan kode melalui aplikasi komputer dan MCP lokal; tidak berjalan otomatis di browser ZORE AI.",url:"https://antigravity.google",status:"Aplikasi komputer",action:"Buka Antigravity"},
+    {name:"Opal",tag:"STATUS PRODUK",desc:"Opal telah dihentikan. Gunakan fitur Gemini yang tersedia sebagai alternatif.",url:"https://gemini.google.com",status:"Tidak tersedia",action:"Buka Gemini"}
   ];
-  return `<section class="google-tools-panel"><div class="section-heading"><div><span>GOOGLE AI TOOLKIT</span><h2>Alat AI pendukung ZORE AI</h2></div><span>MODE GRATIS</span></div><p class="google-tools-intro">AI TOOL ASSISTANT aktif: saat tugas dikirim, sistem memilih rekomendasi alat pendukung berdasarkan jabatan karyawan dan jenis pekerjaan. Gemini bawaan ZORE AI tetap mengerjakan inti tugas. Alat eksternal dipakai secara manual melalui akun Google dan hasilnya dapat dimasukkan kembali ke laporan.</p><div class="google-tools-grid">${tools.map(t=>`<article class="google-tool-card"><span class="google-tool-tag">${esc(t.tag)}</span><h3>${esc(t.name)}</h3><p>${esc(t.desc)}</p><div class="google-tool-status">${esc(t.status)}</div><a href="${t.url}" target="_blank" rel="noopener noreferrer">${esc(t.action)} ↗</a></article>`).join("")}</div><p class="google-tools-note"><strong>Catatan koneksi:</strong> Bagian ini adalah pintasan resmi dan alur pertukaran file, bukan koneksi API otomatis. Sinkronisasi otomatis memerlukan API/OAuth dan izin akun; tidak akan diaktifkan diam-diam atau memakai layanan berbayar.</p></section>`;
+  return `<section class="google-tools-panel"><div class="section-heading"><div><span>GOOGLE AI TOOLKIT</span><h2>Alat AI pendukung ZORE AI</h2></div><span>MODE GRATIS / PREVIEW</span></div><p class="google-tools-intro">AI TOOL ASSISTANT memilih rekomendasi alat berdasarkan jabatan dan jenis pekerjaan. Koneksi Gemini Notebook menggunakan OAuth resmi; ZORE AI hanya meminta izin notebook, bukan kata sandi Google.</p><div class="google-tools-grid">${tools.map(t=>`<article class="google-tool-card"><span class="google-tool-tag">${esc(t.tag)}</span><h3>${esc(t.name)}</h3><p>${esc(t.desc)}</p><div class="google-tool-status">${esc(t.status)}</div><a href="${t.url}" target="_blank" rel="noopener noreferrer">${esc(t.action)} ↗</a></article>`).join("")}</div><div class="google-notebook-actions"><button type="button" class="primary" id="notebook-connect">${googleNotebookAccessToken?"Google Notebook terhubung":"Hubungkan Google Notebook (OAuth)"}</button><button type="button" class="secondary" id="notebook-sync">Kirim hasil gabungan terakhir ke Notebook</button><p class="google-tools-note">Sinkronisasi mengirim hasil final gabungan karyawan ke notebook milik akun Google yang Anda izinkan.</p></div><p class="google-tools-note"><strong>Persiapan satu kali:</strong> Gemini Notebook API harus diaktifkan pada Google Cloud project yang dipakai OAuth ZORE AI, dan scope <code>https://www.googleapis.com/auth/notebook</code> harus diizinkan pada layar persetujuan Google. API gratis selama kuota Public Preview; bukan jaminan tanpa batas.</p></section>`;
 }
 function renderWorkspace(){
   if(officeInstance){officeInstance.destroy();officeInstance=null;}
@@ -87,6 +120,8 @@ function renderWorkspace(){
   const host=document.querySelector("#zore-office-mount");
   try{officeInstance=mountZoreVirtualOffice(host,{employees:EMPLOYEE_PROFILES,onEmployeeSelect:employee=>selectEmployee(employee.id)});}catch(e){host.innerHTML='<p class="empty-state">Tampilan 3D tidak dapat dimuat. Panel kerja tetap tersedia.</p>';console.error(e);}
   document.querySelector("#signout").addEventListener("click",async()=>{await supabase.auth.signOut();});
+  document.querySelector("#notebook-connect")?.addEventListener("click",connectGoogleNotebook);
+  document.querySelector("#notebook-sync")?.addEventListener("click",syncFinalWorkToNotebook);
   document.querySelectorAll("[data-org-profile]").forEach(b=>b.addEventListener("click",()=>selectEmployee(b.dataset.orgProfile)));
   document.querySelector("#profile-panel").addEventListener("click",()=>{});
   document.querySelector("#task-form").addEventListener("submit",assignTask);
