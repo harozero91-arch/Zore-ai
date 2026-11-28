@@ -28,26 +28,26 @@ function makeSlides({ title, employeeName, results }) {
   let finalText = source;
 
   // HTML deliverables must be presented as readable content, not as raw source code.
-  if (/^(?:<!doctype\\s+html|<html\\b)/i.test(source)) {
+  if (/^(?:<!doctype\s+html|<html\b)/i.test(source)) {
     const doc = new DOMParser().parseFromString(source, "text/html");
     doc.querySelectorAll("script,style,noscript,template,svg").forEach(node => node.remove());
     doc.querySelectorAll("[hidden],[aria-hidden='true'],[style*='display:none'],[style*='display: none']")
       .forEach(node => node.remove());
     finalText = String(doc.body?.innerText || doc.body?.textContent || "")
-      .replace(/[\\t\\u00a0]+/g, " ")
-      .replace(/ *\\n */g, "\\n")
-      .replace(/\\n{3,}/g, "\\n\\n")
+      .replace(/[\t\u00a0]+/g, " ")
+      .replace(/ *\n */g, "\n")
+      .replace(/\n{3,}/g, "\n\n")
       .trim();
     if (!finalText) {
       finalText = "Dokumen HTML final telah diperiksa dan digabungkan. Isi visual interaktif tidak dapat dirender otomatis pada mode presentasi teks ini.";
     }
   }
 
-  const paragraphs = finalText.split(/\\n{2,}/);
+  const paragraphs = finalText.split(/\n{2,}/);
   let page = "";
   let pageNo = 1;
   for (const paragraph of paragraphs) {
-    const candidate = page ? page + "\\n\\n" + paragraph : paragraph;
+    const candidate = page ? page + "\n\n" + paragraph : paragraph;
     if (candidate.length > 1050 && page) {
       slides.push({ heading: "HASIL AKHIR · BAGIAN " + pageNo++, body: page });
       page = paragraph;
@@ -60,7 +60,6 @@ function makeSlides({ title, employeeName, results }) {
   });
   return slides;
 }
-
 function drawSlide(ctx, slide, index, total) {
   ctx.fillStyle = "#17130f";
   ctx.fillRect(0, 0, WIDTH, HEIGHT);
