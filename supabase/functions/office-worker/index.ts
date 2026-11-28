@@ -274,7 +274,8 @@ async function dispatch2DAnimationTask(t: Task, emp: Employee, designBrief: stri
   const forbidden = ['subprocess', 'socket', 'requests', 'urllib', 'httpx', 'os.system(', 'eval(', 'exec('];
   if (forbidden.some(term => lowerScript.includes(term))) throw new Error('Skrip animasi 2D ditolak oleh pemeriksaan keamanan.');
   const requiredInputs = { task_name: (t.title + ' [ZORE_TASK_ID:' + t.id + '] [ZORE_VERSION:' + String(t.version || 1) + ']').slice(0, 200), employee: (emp.name + ' — ' + emp.role).slice(0, 200), animation_script: script };
-  for (const [key, value] of Object.entries(requiredInputs)) { if (typeof value !== 'string' || !value.trim()) throw new Error('Input workflow wajib kosong: ' + key); }\n  if (requiredInputs.animation_script.length > 20000) throw new Error('Input animation_script melebihi 20.000 karakter.');\n  const payload = { ref: 'main', inputs: requiredInputs };
+  for (const [key, value] of Object.entries(requiredInputs)) { if (typeof value !== 'string' || !value.trim()) throw new Error('Input workflow wajib kosong: ' + key); }
+  if (requiredInputs.animation_script.length > 20000) throw new Error('Input animation_script melebihi 20.000 karakter.');\n  const payload = { ref: 'main', inputs: requiredInputs };
   const response = await fetch(apiBase + '/actions/workflows/' + workflow + '/dispatches', {
     method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
     body: JSON.stringify(payload), signal: AbortSignal.timeout(20000)
