@@ -13,12 +13,11 @@ app.setCanvasResolution(pc.RESOLUTION_AUTO);
 app.scene.ambientLight=new pc.Color(.34,.30,.25);
 app.scene.toneMapping=pc.TONEMAP_FILMIC;
 app.scene.gammaCorrection=pc.GAMMA_SRGB;
-app.start();
 
 const camera=new pc.Entity("ZORE Orbit Camera");
 camera.addComponent("camera",{clearColor:new pc.Color(.31,.28,.24),fov:48,nearClip:.1,farClip:120});
 app.root.addChild(camera);
-let yaw=-42,pitch=24,distance=35,targetX=0,targetY=2,targetZ=0;
+let yaw=0,pitch=22,distance=30,targetX=0,targetY=2,targetZ=0;
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function updateCamera(){const p=pitch*Math.PI/180,y=yaw*Math.PI/180;camera.setPosition(targetX+distance*Math.cos(p)*Math.sin(y),targetY+distance*Math.sin(p),targetZ+distance*Math.cos(p)*Math.cos(y));camera.lookAt(targetX,targetY,targetZ);}
 updateCamera();
@@ -52,14 +51,18 @@ const workers=[employee(-5,-2,navy,18),employee(5,-2,green,-18),employee(-8,4,na
 // Subtle idle movement without continuous expensive skeletal animation.
 let elapsed=0;app.on("update",dt=>{elapsed+=dt;workers.forEach((w,i)=>{w.setLocalPosition(w.getLocalPosition().x,Math.sin(elapsed*1.2+i)*.025,w.getLocalPosition().z);});frameCount++;const now=performance.now();if(now-lastFpsTime>=1000){fps=Math.round(frameCount*1000/(now-lastFpsTime));frameCount=0;lastFpsTime=now;stats.textContent=fps+" FPS · "+(mobile?"Android/mobile":"desktop")+" · "+quality;}});
 
-function applyQuality(next){quality=next;const ratio=next==="high"?1:next==="low"?(mobile?.65:.8):(mobile?.78:.9);app.graphicsDevice.maxPixelRatio=ratio;const light=sun.light;if(light){light.castShadows=next==="high"&&!mobile;if(light.castShadows)light.shadowResolution=1024;}app.graphicsDevice.updateClientRect();app.resizeCanvas(canvas.clientWidth,canvas.clientHeight);}
+function applyQuality(next){quality=next;const ratio=next==="high"?1:next==="low"?(mobile?.65:.8):(mobile?.78:.9);app.graphicsDevice.maxPixelRatio=ratio;const light=sun.light;if(light){light.castShadows=next==="high"&&!mobile;if(light.castShadows)light.shadowResolution=1024;}app.resizeCanvas();}
 qualitySelect.addEventListener("change",()=>applyQuality(qualitySelect.value));applyQuality("auto");
-document.getElementById("reset").addEventListener("click",()=>{yaw=-42;pitch=24;distance=35;targetX=0;targetY=2;targetZ=0;updateCamera();});
+document.getElementById("reset").addEventListener("click",()=>{yaw=0;pitch=22;distance=30;targetX=0;targetY=2;targetZ=0;updateCamera();});
 const pointers=new Map();let previous=null,previousPinch=0;
 canvas.addEventListener("pointerdown",e=>{canvas.setPointerCapture(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});previous={x:e.clientX,y:e.clientY};if(pointers.size===2){const p=[...pointers.values()];previousPinch=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);}});
 canvas.addEventListener("pointermove",e=>{if(!pointers.has(e.pointerId))return;const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===1&&previous){yaw-= (e.clientX-previous.x)*.35;pitch=clamp(pitch+(e.clientY-previous.y)*.22,12,43);updateCamera();}else if(pointers.size===2){const p=[...pointers.values()];const pinch=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);if(previousPinch){distance=clamp(distance-(pinch-previousPinch)*.045,22,48);updateCamera();}previousPinch=pinch;}previous={x:e.clientX,y:e.clientY};});
 function endPointer(e){pointers.delete(e.pointerId);previous=null;previousPinch=0;}canvas.addEventListener("pointerup",endPointer);canvas.addEventListener("pointercancel",endPointer);
 canvas.addEventListener("wheel",e=>{e.preventDefault();distance=clamp(distance+e.deltaY*.018,22,48);updateCamera();},{passive:false});
 const resizeObserver=new ResizeObserver(()=>{if(!disposed){app.resizeCanvas(canvas.clientWidth,canvas.clientHeight);}});resizeObserver.observe(viewport);
-status.textContent="PlayCanvas Engine aktif · prototipe uji";
+window.addEventListener("error",e=>{status.textContent="Kesalahan grafis: "+(e.message||"render gagal");stats.textContent="Mesin 3D mengalami kesalahan. Muat ulang halaman.";});
+window.addEventListener("unhandledrejection",e=>{status.textContent="Kesalahan mesin: "+String(e.reason||"inisialisasi gagal");stats.textContent="Mesin 3D gagal dijalankan.";});
+app.start();
+app.resizeCanvas();
+status.textContent="PlayCanvas Engine aktif · kantor sedang dirender";
 window.addEventListener("beforeunload",()=>{disposed=true;resizeObserver.disconnect();app.destroy();});
