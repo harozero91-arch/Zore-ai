@@ -1,6 +1,6 @@
 import {
   Engine, Scene, Vector3, Color3, Color4, HemisphericLight, DirectionalLight,
-  MeshBuilder, StandardMaterial, PBRMaterial, ArcRotateCamera, ShadowGenerator
+  MeshBuilder, PBRMaterial, ArcRotateCamera, ShadowGenerator, TransformNode
 } from "@babylonjs/core";
 
 const canvas=document.getElementById("renderCanvas");
@@ -50,7 +50,7 @@ box("monitor screen",1.38,.82,.025,0,2.47,-3.37,glass);
 box("monitor stand",.16,.42,.16,0,2.12,-3.48,gold);
 for(const x of [-1.15,1.15]){cylinder("chair base",.72,.12,x, .18,-.65,dark,24);cylinder("chair post",.12,.65,x,.5,-.65,gold);box("chair seat",1.25,.25,1.1,x,.95,-.65,green);box("chair back",1.25,1.35,.22,x,1.7,-1.12,green);}
 function worker(x,z,shirt,turn=0){
- const root=new BABYLON.TransformNode("employee",scene);root.position.set(x,0,z);root.rotation.y=turn;
+ const root=new TransformNode("employee",scene);root.position.set(x,0,z);root.rotation.y=turn;
  const body=MeshBuilder.CreateCapsule("employee body",{height:1.45,radius:.34},scene);body.position.y=1.12;body.material=shirt;body.parent=root;
  const head=MeshBuilder.CreateSphere("employee head",{diameter:.58,segments:16},scene);head.position.y=2.12;head.material=skin;head.parent=root;
  const hair=MeshBuilder.CreateSphere("employee hair",{diameter:.6,segments:12,slice:0.48},scene);hair.position.y=2.32;hair.material=dark;hair.parent=root;
