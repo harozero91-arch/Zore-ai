@@ -158,10 +158,10 @@ export function mountZoreVirtualOffice(host, options = {}) {
   warmFill.position.set(-11, 5.1, -3); scene.add(warmFill);
   const neutralFill = new THREE.PointLight(0xffedda, 16, 28, 1.8);
   neutralFill.position.set(11, 5.0, -3); scene.add(neutralFill);
-  const meetingFill = new THREE.PointLight(0xffd49a, 23, 19, 1.65);
-  meetingFill.position.set(0, 5.6, 1); scene.add(meetingFill);
-  const loungeFill = new THREE.PointLight(0xd8e8ff, 13, 22, 1.8);
-  loungeFill.position.set(12, 4.4, 10); scene.add(loungeFill);
+  const conferenceBounce = new THREE.PointLight(0xffd49a, 15, 19, 1.65);
+  conferenceBounce.position.set(0, 5.6, 1); scene.add(conferenceBounce);
+  const loungeBounce = new THREE.PointLight(0xd8e8ff, 9, 22, 1.8);
+  loungeBounce.position.set(12, 4.4, 10); scene.add(loungeBounce);
   const receptionFill = new THREE.PointLight(0xffd9ad, 12, 18, 1.8);
   receptionFill.position.set(-14, 4.2, 10); scene.add(receptionFill);
   const shadowResolution = qualityTier === "high" ? 2048 : 1024;
@@ -1356,8 +1356,8 @@ export function mountZoreVirtualOffice(host, options = {}) {
       chandelier.intensity = 76 - daylight * 48;
       warmFill.intensity = 14 + daylight * 5;
       neutralFill.intensity = 12 + daylight * 4;
-      meetingFill.intensity = 18 + daylight * 5;
-      loungeFill.intensity = 10 + daylight * 3;
+      conferenceBounce.intensity = 11 + daylight * 4;
+      loungeBounce.intensity = 7 + daylight * 2;
       receptionFill.intensity = 9 + daylight * 3;
       sun.position.set(-22 + daylight * 8, 12 + daylight * 23, 18);
     }
