@@ -790,6 +790,19 @@ export function mountZoreVirtualOffice(host, options = {}) {
       const fringe = new THREE.Mesh(new THREE.SphereGeometry(0.17,14,10),hairMat);
       fringe.scale.set(1.0,0.5,0.55); fringe.position.set(0,1.84,0.205); group.add(fringe);
     }
+    // Fine curved hair fibers add a groomed silhouette at close range.
+    const fiberMat = new THREE.MeshStandardMaterial({color:hairPalette[i]||0x29201c,roughness:0.82});
+    for(let strand=0;strand<5;strand++){
+      const side=(strand-2)*0.075;
+      const curve=new THREE.CatmullRomCurve3([
+        new THREE.Vector3(side*0.55,1.91,0.17),
+        new THREE.Vector3(side*0.9,1.98,0.13),
+        new THREE.Vector3(side,2.005,0.045),
+        new THREE.Vector3(side*1.08,1.94,-0.02)
+      ]);
+      const fiber=new THREE.Mesh(new THREE.TubeGeometry(curve,12,0.009,5,false),fiberMat);
+      fiber.castShadow=true; group.add(fiber);
+    }
     // Expressive eyes, brows, nose and a subtle smile make the face readable at office scale.
     const eyeWhite = material(0xfff8ed,0.28);
     const eyeMat = material([0x38261d,0x30251e,0x463329,0x263b45][i%4],0.3);
@@ -815,10 +828,18 @@ export function mountZoreVirtualOffice(host, options = {}) {
     noseBridge.position.set(0,1.61,0.282); noseBridge.rotation.x=Math.PI/2; group.add(noseBridge);
     const nose = new THREE.Mesh(new THREE.SphereGeometry(0.037,14,10),skinMat);
     nose.scale.set(0.82,0.72,0.72); nose.position.set(0,1.575,0.307); group.add(nose);
-    const mouth = new THREE.Mesh(new THREE.TorusGeometry(0.05,0.009,8,20,Math.PI),material(0x9b5b55,0.55));
-    mouth.position.set(0,1.525,0.282); mouth.rotation.z=Math.PI; group.add(mouth);
-    const lowerLip = new THREE.Mesh(new THREE.SphereGeometry(0.025,12,8),material(0xb87570,0.55));
-    lowerLip.scale.set(1.2,0.32,0.35); lowerLip.position.set(0,1.505,0.279); group.add(lowerLip);
+    const lipMat = new THREE.MeshPhysicalMaterial({color:0x985b58,roughness:0.48,clearcoat:0.12});
+    const mouth = new THREE.Mesh(new THREE.SphereGeometry(0.047,20,14),material(0x321d1b,0.82));
+    mouth.scale.set(1.0,0.12,0.24); mouth.position.set(0,1.523,0.284); group.add(mouth);
+    const upperLip = new THREE.Mesh(new THREE.TorusGeometry(0.046,0.008,8,24,Math.PI),lipMat);
+    upperLip.position.set(0,1.526,0.287); upperLip.rotation.z=Math.PI; group.add(upperLip);
+    const lowerLip = new THREE.Mesh(new THREE.SphereGeometry(0.035,14,10),lipMat);
+    lowerLip.scale.set(1.05,0.18,0.32); lowerLip.position.set(0,1.505,0.286); group.add(lowerLip);
+    const cheekMat = new THREE.MeshPhysicalMaterial({color:0xc98275,roughness:0.82,transparent:true,opacity:0.22});
+    for(const side of [-1,1]){
+      const cheek = new THREE.Mesh(new THREE.SphereGeometry(0.052,14,10),cheekMat);
+      cheek.scale.set(1.35,0.58,0.22); cheek.position.set(side*0.17,1.555,0.252); group.add(cheek);
+    }
     // Tailored clothing layers, lapels and a role-specific uniform silhouette.
     const shirtMat = material(0xf1e9d8,0.72);
     if (["navy-suit","navy-blazer","plum-professional"].includes(visual.wardrobe)) {
@@ -1196,10 +1217,12 @@ export function mountZoreVirtualOffice(host, options = {}) {
     const bubble = makeBubble(message);
     person.add(bubble);
     person.userData.bubble = bubble;
-    person.userData.bubbleUntil = now + 5800;
+    const spokenWords=String(message||"").trim().split(/\s+/).filter(Boolean).length;
+    const speechDuration=THREE.MathUtils.clamp(spokenWords*310,2600,7200);
+    person.userData.bubbleUntil = now + Math.max(5800,speechDuration);
     person.userData.isSpeaking = true;
-    person.userData.speakingUntil = now + 3600;
-    person.userData.gestureUntil = now + 2600;
+    person.userData.speakingUntil = now + speechDuration;
+    person.userData.gestureUntil = now + Math.min(speechDuration,3200);
   }
 
   const raycaster = new THREE.Raycaster();
@@ -1499,11 +1522,11 @@ export function mountZoreVirtualOffice(host, options = {}) {
         data.eyelids?.forEach(lid=>{lid.scale.y=0.02+blink*0.74;lid.position.y=1.67-blink*0.012;});
         data.eyes?.forEach((eye,index)=>{eye.position.y=1.67+Math.sin(now*0.0012+data.phase+index)*0.004;});
         if(data.isSpeaking && now>data.speakingUntil)data.isSpeaking=false;
-        const talking=data.isSpeaking?Math.abs(Math.sin(now*0.018+data.phase))*0.9:0;
+        const speechPulse=data.isSpeaking?Math.pow(Math.max(0,Math.sin(now*0.021+data.phase)),1.25):0;
         if(data.mouth){
-          data.mouth.scale.y=1+talking*1.7;
-          data.mouth.scale.x=1+talking*0.16;
-          data.mouth.position.y=1.525-talking*0.008;
+          data.mouth.scale.y=0.12+speechPulse*0.62;
+          data.mouth.scale.x=1+speechPulse*0.12;
+          data.mouth.position.y=1.523-speechPulse*0.012;
         }
         if(data.head && data.state!=="working"){
           data.head.rotation.y=Math.sin(now*0.0007+data.phase)*0.055;
