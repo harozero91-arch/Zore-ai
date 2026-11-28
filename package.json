@@ -13,7 +13,8 @@
     "@supabase/supabase-js": "2.119.2",
     "mp4-muxer": "^5.2.2",
     "@babylonjs/core": "^8.0.0",
-    "playcanvas": "^2.24.3"
+    "playcanvas": "^2.24.3",
+    "@babylonjs/loaders": "^8.0.0"
   },
   "devDependencies": {
     "vite": "^6.0.0"
