@@ -24,7 +24,7 @@ async function monitorOne(build: any) {
       const list = await listResponse.json();
       run = (list.workflow_runs || []).find((item: any) =>
         String(item.display_title || '').includes(build.task_id) &&
-        String(item.display_title || '').includes('v' + build.version));
+        (String(item.display_title || '').includes('ZORE_VERSION:' + build.version) || String(item.display_title || '').includes('v' + build.version)));
       if (run?.id) runId = Number(run.id);
     }
   }
