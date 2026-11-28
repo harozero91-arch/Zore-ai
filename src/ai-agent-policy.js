@@ -56,7 +56,7 @@ const TOOL_ASSIST_BY_ROLE = {
   "AI Background Artist": ["Gemini Notebook — analisis referensi lokasi dan moodboard."],
   "AI 2D Animator": ["Antigravity — review/debug kode secara manual di komputer; Stitch — rancangan UI/flow bila diperlukan."],
   "AI Cleanup & Color Artist": ["Gemini Notebook — telaah panduan warna, continuity, dan catatan QC."],
-  "AI Graphic Designer & Video Editor": ["Stitch — rancangan UI/prototipe; Antigravity — bantuan coding dan debugging secara manual di komputer."]
+  "AI Visual Reverse Engineer & Code Specialist": ["Stitch — rancangan UI/prototipe; Antigravity — bantuan coding dan debugging secara manual di komputer."]
 };
 
 export function buildEmployeeTaskBrief(employee, title, instructions) {
