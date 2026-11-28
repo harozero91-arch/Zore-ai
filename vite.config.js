@@ -8,10 +8,15 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: "index.html",
-        babylonPreview: "babylon-preview.html"
+        babylonPreview: "babylon-preview.html",
+        playcanvasPreview: "playcanvas-preview.html"
       },
       output: {
         manualChunks(id) {
+          if (id.includes("/node_modules/playcanvas/")) {
+            return "playcanvas-vendor";
+          }
+
           if (id.includes("/node_modules/@babylonjs/")) {
             return "babylon-vendor";
           }
