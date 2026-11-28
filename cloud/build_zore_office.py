@@ -1,3 +1,4 @@
+# Headless Blender generator for the ZORE AI executive office.
 import bpy, math, os
 from mathutils import Vector
 
