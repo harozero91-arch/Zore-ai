@@ -21,7 +21,7 @@ function taskStatusLabel(task){
   const latest=resultRows.filter(r=>String(r.task_id)===String(task.id)).sort((a,b)=>Number(b.version)-Number(a.version))[0];
   if(status==="submitted"&&latest?.build_status==="queued")return "Menunggu build";
   if(status==="submitted"&&latest?.build_status==="in_progress")return "Build sedang berjalan";
-  if(latest?.build_status==="failed")return "Build gagal · perlu perbaikan";
+  if(latest?.build_status==="failed"&&["revision","failed"].includes(status))return "Build gagal · perlu perbaikan";
   if(status!=="submitted")return statusLabel[status]||status;
   if(!task.chain_id||Number(task.stage_order||0)===0)return "Menunggu persetujuan awal";
   if(Number(task.employee_idx)===1&&/pemeriksaan akhir dan penggabungan hasil tim/i.test(task.title||""))return "Menunggu pemeriksaan akhir";
@@ -342,7 +342,7 @@ function taskMatchesFilter(task,filter){
   if(filter==="queue")return ["queued","in_progress","revision"].includes(task.status);
   if(filter==="build_pending")return ["queued","in_progress"].includes(build);
   if(filter==="build_passed")return build==="passed";
-  if(filter==="build_failed")return build==="failed";
+  if(filter==="build_failed")return build==="failed"&&["revision","failed"].includes(task.status);
   if(filter==="review")return task.status==="submitted"&&["passed","not_required"].includes(build);
   if(filter==="ready_download")return build==="passed"&&Array.isArray(result?.files_manifest)&&result.files_manifest.length>0;
   return filter==="all"||task.status===filter;
