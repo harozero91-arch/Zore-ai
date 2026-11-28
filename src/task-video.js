@@ -24,12 +24,30 @@ function makeSlides({ title, employeeName, results }) {
     heading: "HASIL PENGGABUNGAN ZORE AI",
     body: [title, "Pemeriksaan akhir dan penggabungan oleh: " + (employeeName || "Manajer ZORE AI")].join("\n\n")
   }];
-  const finalText = String(results[0]?.content || "").trim();
-  const paragraphs = finalText.split(/\n{2,}/);
+  const source = String(results[0]?.content || "").trim();
+  let finalText = source;
+
+  // HTML deliverables must be presented as readable content, not as raw source code.
+  if (/^(?:<!doctype\\s+html|<html\\b)/i.test(source)) {
+    const doc = new DOMParser().parseFromString(source, "text/html");
+    doc.querySelectorAll("script,style,noscript,template,svg").forEach(node => node.remove());
+    doc.querySelectorAll("[hidden],[aria-hidden='true'],[style*='display:none'],[style*='display: none']")
+      .forEach(node => node.remove());
+    finalText = String(doc.body?.innerText || doc.body?.textContent || "")
+      .replace(/[\\t\\u00a0]+/g, " ")
+      .replace(/ *\\n */g, "\\n")
+      .replace(/\\n{3,}/g, "\\n\\n")
+      .trim();
+    if (!finalText) {
+      finalText = "Dokumen HTML final telah diperiksa dan digabungkan. Isi visual interaktif tidak dapat dirender otomatis pada mode presentasi teks ini.";
+    }
+  }
+
+  const paragraphs = finalText.split(/\\n{2,}/);
   let page = "";
   let pageNo = 1;
   for (const paragraph of paragraphs) {
-    const candidate = page ? page + "\n\n" + paragraph : paragraph;
+    const candidate = page ? page + "\\n\\n" + paragraph : paragraph;
     if (candidate.length > 1050 && page) {
       slides.push({ heading: "HASIL AKHIR · BAGIAN " + pageNo++, body: page });
       page = paragraph;
@@ -38,7 +56,7 @@ function makeSlides({ title, employeeName, results }) {
   if (page) slides.push({ heading: "HASIL AKHIR · BAGIAN " + pageNo, body: page });
   slides.push({
     heading: "PENUTUP",
-    body: "Video ini dibuat dari hasil akhir gabungan yang diserahkan untuk pemeriksaan. Audio merupakan dubbing narasi berbahasa Indonesia."
+    body: "Video ini dibuat dari isi hasil akhir gabungan yang diserahkan untuk pemeriksaan. Audio merupakan dubbing narasi berbahasa Indonesia."
   });
   return slides;
 }
