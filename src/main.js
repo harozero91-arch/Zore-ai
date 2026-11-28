@@ -245,8 +245,20 @@ async function exportTaskMp4(taskId,button){
   button.disabled=true;button.textContent="Membuat dubbing dan MP4…";
   try{
     const employee=employeeByIdx(task.employee_idx);
-    const cleanText=String(results[0].content).replace(/```[a-zA-Z0-9_-]*\n?/g,"").replace(/`{3}/g,"").trim();
-    const narration="Hasil penggabungan akhir ZORE AI. Judul pekerjaan: "+task.title+". Pemeriksaan dan penggabungan dilakukan oleh "+(employee?.name||"Manajer ZORE AI")+". Berikut isi hasil akhir. "+cleanText;
+    let cleanText=String(results[0].content||"").trim();
+    if(/^\s*<(!doctype\s+html|html\b)/i.test(cleanText)){
+      const parsed=new DOMParser().parseFromString(cleanText,"text/html");
+      parsed.querySelectorAll("script,style,noscript,template,svg,canvas").forEach(node=>node.remove());
+      cleanText=String(parsed.body?.innerText||parsed.body?.textContent||"");
+    }else{
+      cleanText=cleanText.replace(/```[a-zA-Z0-9_-]*\n?[\s\S]*?```/g,"Bagian kode program disertakan dalam hasil akhir.")
+        .replace(/`([^`]+)`/g,"$1").replace(/^\s*#{1,6}\s*/gm,"")
+        .replace(/^\s*[-*+]\s+/gm,"").replace(/^\s*\d+[.)]\s+/gm,"")
+        .replace(/https?:\/\/\S+/g,"tautan").replace(/<[^>]*>/g," ")
+        .replace(/[{}<>_=|#*~]/g," ").replace(/[ \t]+/g," ").trim();
+    }
+    if(!cleanText)throw new Error("Tidak ditemukan teks narasi yang dapat dibacakan dari hasil akhir.");
+    const narration="Hasil penggabungan akhir ZORE AI. Judul pekerjaan: "+task.title+". Pemeriksaan dan penggabungan dilakukan oleh "+(employee?.name||"Manajer ZORE AI")+". Berikut ringkasan isi hasil akhir. "+cleanText;
     if(narration.length>14000)throw new Error("Hasil gabungan terlalu panjang untuk dubbing otomatis. Ringkas hasil final terlebih dahulu, lalu coba lagi.");
     const {data:voiceData,error:voiceError}=await supabase.functions.invoke("office-voice",{body:{text:narration}});
     if(voiceError)throw new Error(voiceError.message||"Layanan dubbing tidak merespons.");
