@@ -235,17 +235,58 @@ function detectArtifact(content: string, title: string) {
 }
 async function dispatch2DAnimationTask(t: Task, emp: Employee, designBrief: string) {
   const token = Deno.env.get('GITHUB_ACTIONS_TOKEN') ?? '';
-  if (!token) throw new Error('Animasi 2D otomatis belum aktif: secret GITHUB_ACTIONS_TOKEN belum tersedia.');
+  if (!token) throw new Error('Animasi 2D otomatis belum aktif: secret GITHUB_ACTIONS_TOKEN belum tersedia di Supabase.');
+  const workflow = 'employee-2d-animation-worker.yml';
+  const workflowUrl = 'https://github.com/harozero91-arch/Zore-ai/actions/workflows/' + workflow;
+  const apiBase = 'https://api.github.com/repos/harozero91-arch/Zore-ai';
+  const headers = { Authorization: 'Bearer ' + token, Accept: 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28' };
+  const request = async (url: string) => fetch(url, { headers, signal: AbortSignal.timeout(12000) });
+  const branchCheck = await request(apiBase + '/branches/main');
+  if (!branchCheck.ok) {
+    const detail = (await branchCheck.text()).slice(0, 300);
+    if (branchCheck.status === 401) throw new Error('GitHub 401: token GITHUB_ACTIONS_TOKEN tidak valid atau kedaluwarsa. Perbarui secret Supabase.');
+    if (branchCheck.status === 403) throw new Error('GitHub 403: token tidak memiliki izin membaca repository/branch. Pastikan akses repository Zore-ai diaktifkan.');
+    if (branchCheck.status === 404) throw new Error('GitHub 404: repository atau branch main tidak ditemukan atau token tidak memiliki akses.');
+    throw new Error('Pemeriksaan branch main gagal (' + branchCheck.status + '): ' + detail);
+  }
+  const workflowCheck = await request(apiBase + '/actions/workflows/' + workflow);
+  if (!workflowCheck.ok) {
+    const detail = (await workflowCheck.text()).slice(0, 300);
+    if (workflowCheck.status === 401) throw new Error('GitHub 401: autentikasi token gagal saat memeriksa workflow animasi 2D.');
+    if (workflowCheck.status === 403) throw new Error('GitHub 403: token perlu izin Actions: read and write pada repository Zore-ai.');
+    if (workflowCheck.status === 404) throw new Error('GitHub 404: workflow ' + workflow + ' tidak ditemukan pada repository yang dapat diakses token.');
+    throw new Error('Pemeriksaan workflow gagal (' + workflowCheck.status + '): ' + detail);
+  }
+  const workflowInfo = await workflowCheck.json();
+  if (workflowInfo.state !== 'active') throw new Error('Workflow animasi 2D ditemukan tetapi tidak aktif (state: ' + workflowInfo.state + ').');
+  const sourceResponse = await request(apiBase + '/contents/.github/workflows/' + workflow + '?ref=main');
+  if (!sourceResponse.ok) throw new Error('Tidak dapat memeriksa konfigurasi workflow di main (' + sourceResponse.status + ').');
+  const sourceInfo = await sourceResponse.json();
+  const yaml = atob(String(sourceInfo.content || '').replace(/\s/g, ''));
+  if (!/^\s*on\s*:[\s\S]*?^\s{2}workflow_dispatch\s*:/m.test(yaml)) {
+    throw new Error('Workflow ' + workflow + ' di branch main belum memiliki trigger workflow_dispatch. Perbaiki file workflow di main terlebih dahulu.');
+  }
   const scriptPrompt = 'Buat skrip Python 3 mandiri menggunakan Pillow. Tugas: ' + t.title + '\nINSTRUKSI: ' + t.instructions + '\nBRIEF VISUAL: ' + designBrief.slice(0, 10000) + '\n\nATURAN: keluaran hanya kode Python tanpa Markdown. Simpan semua file di os.environ["ZORE_OUTPUT_DIR"]. Buat folder frames dan hasilkan PNG berurutan ukuran 1280x720, 24 fps, durasi 5-10 detik kecuali brief menentukan lain. Buat animasi sungguhan dengan perubahan posisi/pose antar-frame, timing/easing halus, latar, karakter/objek dan komposisi. Gunakan Pillow; jangan mengunduh aset. Simpan animation.json berisi fps, frame_count, deskripsi adegan. Jangan gunakan jaringan, subprocess, socket, requests, urllib, httpx, os.system, eval, atau exec.';
   let script = (await askGemini('Kamu senior 2D animation technical director. Buat skrip Python Pillow yang menghasilkan animasi frame-by-frame nyata dan aman.', scriptPrompt, emp)).trim();
-  if (script.startsWith('```')) { script = script.replace(/^```[a-zA-Z]*\n?/, ''); if (script.endsWith('```')) script = script.slice(0, -3); }
+  if (script.startsWith('```')) { script = script.replace(/^\`\`\`[a-zA-Z]*\n?/, ''); if (script.endsWith('```')) script = script.slice(0, -3); }
   if (!script || script.length > 20000) throw new Error('Skrip animasi 2D tidak valid atau melebihi 20.000 karakter.');
   const lowerScript = script.toLowerCase();
   const forbidden = ['subprocess', 'socket', 'requests', 'urllib', 'httpx', 'os.system(', 'eval(', 'exec('];
   if (forbidden.some(term => lowerScript.includes(term))) throw new Error('Skrip animasi 2D ditolak oleh pemeriksaan keamanan.');
-  const response = await fetch('https://api.github.com/repos/harozero91-arch/Zore-ai/actions/workflows/employee-2d-animation-worker.yml/dispatches', { method: 'POST', headers: { 'Authorization': 'Bearer ' + token, 'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28', 'Content-Type': 'application/json' }, body: JSON.stringify({ ref: 'main', inputs: { task_name: t.title.slice(0, 200), employee: emp.name + ' — ' + emp.role, animation_script: script } }), signal: AbortSignal.timeout(20000) });
-  if (response.status !== 204) throw new Error('GitHub menolak tugas animasi 2D (' + response.status + '): ' + (await response.text()).slice(0, 500));
-  return { workflow_url: 'https://github.com/harozero91-arch/Zore-ai/actions/workflows/employee-2d-animation-worker.yml', script_length: script.length };
+  const payload = { ref: 'main', inputs: { task_name: t.title.slice(0, 200), employee: (emp.name + ' — ' + emp.role).slice(0, 200), animation_script: script } };
+  const response = await fetch(apiBase + '/actions/workflows/' + workflow + '/dispatches', {
+    method: 'POST', headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload), signal: AbortSignal.timeout(20000)
+  });
+  if (response.status !== 204) {
+    const detail = (await response.text()).slice(0, 500);
+    if (response.status === 422) throw new Error('GitHub 422: dispatch ditolak setelah pemeriksaan branch dan workflow. Periksa input wajib task_name/employee/animation_script dan trigger workflow_dispatch. Detail GitHub: ' + detail);
+    if (response.status === 403) throw new Error('GitHub 403: token harus memiliki Actions: write dan akses repository Zore-ai. Detail: ' + detail);
+    if (response.status === 404) throw new Error('GitHub 404: repository atau workflow ID/path tidak ditemukan. Detail: ' + detail);
+    if (response.status === 401) throw new Error('GitHub 401: GITHUB_ACTIONS_TOKEN tidak valid atau kedaluwarsa. Detail: ' + detail);
+    throw new Error('GitHub gagal menjalankan workflow (' + response.status + '): ' + detail);
+  }
+  return { workflow_url: workflowUrl, script_length: script.length, workflow: workflow, ref: 'main', dispatch_status: 204 };
 }
 async function dispatchBlenderTask(t: Task, emp: Employee, designBrief: string) {
   const token = Deno.env.get('GITHUB_ACTIONS_TOKEN') ?? '';
